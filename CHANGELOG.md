@@ -4,11 +4,11 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Published Registry versions are
 immutable.
 
-## [Unreleased]
+## [0.1.0] - 2026-07-08
 
 ### Added
 
-- Initial node pack (staging build):
+- Initial node pack:
   - `Extract Workflow Lineage` graph node (local-first; opt-in enhanced recovery).
   - Sidebar tab: drop an image → recovered prompts / models / LoRAs / custom
     nodes / seed / sampler.
@@ -18,6 +18,4 @@ immutable.
   - GitHub Actions: CI (`comfy node validate` + unit tests) and Registry
     publish on release.
   - MIT license, contribution model, OSS-cleanliness release gate.
-
-_This 0.1.0 is a review-ready staging build. It has not been published to the
-ComfyUI Registry — see `PUBLISH_CHECKLIST.md` for the gated go-live steps._
+  - Icon and banner assets.
