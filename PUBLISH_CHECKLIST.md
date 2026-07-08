@@ -40,18 +40,16 @@ tool, not a signing/provenance tool.
 - Add the repo secret **`REGISTRY_ACCESS_TOKEN`** (the Registry *publisher*
   token — **not** a Comfy account key). Never commit it.
 
-## Then: first publish
+## Then: publishing a release
 
-1. Locally validate: `comfy --skip-prompt node validate` (comfy-cli ≥1.12;
-   formerly `registry-test`; also runs in CI).
-2. Bump version if needed in `pyproject.toml` **and** `__init__.py`; add a
-   `CHANGELOG.md` entry (Registry versions are immutable).
-3. Cut a **GitHub Release** → the `publish.yml` action publishes to the Registry.
-4. **Publish ≠ visible**: the mid-2026 scanner can leave a version *Flagged*,
-   which rolls back the public "latest" pointer. Confirm the node appears in
-   ComfyUI-Manager after release; if Flagged, address scan findings and re-cut.
-5. "Verified" author status is automatic once GitHub repo ownership is confirmed
-   (Claim-My-Node).
+All 4 gates above are closed (repo live, IP review clean, PublisherId +
+secret set). For the actual release steps — version bump, tag, GitHub
+Release, watching the publish Action, and confirming Registry visibility —
+see **`docs/RELEASE-RUNBOOK.md`**, the repeatable step-by-step process for
+every release, first or subsequent.
+
+"Verified" author status is automatic once GitHub repo ownership is
+confirmed (Claim-My-Node) — no separate action needed.
 
 ## Integration dependency (not a gate, but sequence-sensitive)
 
