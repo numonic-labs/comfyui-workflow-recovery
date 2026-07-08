@@ -1,9 +1,10 @@
 # Shared inspect contract v0 (node ⇄ hosted endpoint)
 
 This node builds against **contract v0** owned by the private `comfy-inspect`
-service (dispatch D1). It is mirrored here so the node's integration point is
-explicit. **D1 is the source of truth**; if the two drift, D1 wins and this node
-adapts at integration.
+service, a separately-hosted Numonic endpoint. It is mirrored here so the
+node's integration point is explicit. **The hosted service is the source of
+truth**; if the two drift, the service wins and this node adapts at
+integration.
 
 ## Enhanced-recovery request (opt-in only)
 
@@ -14,8 +15,8 @@ Content-Type: multipart/form-data
   include_raw=true|false                 # optional; include raw prompt JSON
 ```
 
-The node also plans to support `{ "image_url": "..." }` JSON bodies if D1 offers
-it; the MVP node sends multipart only.
+The node also plans to support `{ "image_url": "..." }` JSON bodies if the
+hosted service offers it; the MVP node sends multipart only.
 
 ## Response (200)
 
