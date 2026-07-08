@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Unit tests (standard library only)
+        run: python -m unittest discover -s tests -v
+
+  registry-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install comfy-cli
+        run: pip install comfy-cli
+      - name: Validate Registry metadata + security checks
+        # `comfy node validate` (comfy-cli ≥1.12; formerly `registry-test`)
+        # validates pyproject.toml [tool.comfy] + packaging + security checks —
+        # the same gate a publish runs. Verified passing locally 2026-07-07.
+        run: comfy --skip-prompt node validate

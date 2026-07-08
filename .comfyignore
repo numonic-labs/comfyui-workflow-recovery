@@ -1,0 +1,12 @@
+# Files excluded from the published Registry package (kept in the repo).
+tests/
+docs/
+.github/
+.git/
+.gitignore
+CONTRIBUTING.md
+CHANGELOG.md
+PUBLISH_CHECKLIST.md
+requirements-dev.txt
+**/__pycache__/
+*.pyc

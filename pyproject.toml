@@ -1,0 +1,32 @@
+[project]
+name = "comfyui-workflow-recovery"
+version = "0.1.0"
+description = "Drop in a generated image and recover its full ComfyUI workflow lineage — prompts, models, LoRAs, seed, sampler, and custom nodes. Local-first and privacy-preserving."
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.10"
+# Intentionally ZERO runtime dependencies: the node uses only the Python
+# standard library plus modules ComfyUI already provides. This keeps the
+# supply-chain surface empty and eases the Registry security scan.
+dependencies = []
+classifiers = [
+  "Operating System :: OS Independent",
+  "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+# NOTE: repository owner is a placeholder until the public repo is created under
+# github.com/numonic-labs (maintainer-gated). Update before first publish.
+Repository = "https://github.com/numonic-labs/comfyui-workflow-recovery"
+Documentation = "https://github.com/numonic-labs/comfyui-workflow-recovery#readme"
+"Bug Tracker" = "https://github.com/numonic-labs/comfyui-workflow-recovery/issues"
+
+[tool.comfy]
+# PublisherId is globally unique and IMMUTABLE once published. Register the
+# publisher first (Comfy Registry → instant namespace) and replace this
+# placeholder before the first publish. See PUBLISH_CHECKLIST.md gate 4.
+PublisherId = "numonic"
+DisplayName = "Numonic Workflow Recovery"
+Icon = "https://raw.githubusercontent.com/numonic-labs/comfyui-workflow-recovery/main/assets/icon.png"
+Banner = "https://raw.githubusercontent.com/numonic-labs/comfyui-workflow-recovery/main/assets/banner.png"
+requires-comfyui = ">=0.3.0"
