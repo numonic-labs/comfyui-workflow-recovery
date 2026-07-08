@@ -1,10 +1,9 @@
 # Assets
 
-Placeholders. Add real `icon.png` and `banner.png` here at the repo-creation
-gate (see `PUBLISH_CHECKLIST.md` gate 2). `pyproject.toml [tool.comfy]` already
-references:
+- `icon.png` — 256×256, transparent. The Numonic mark alone.
+- `banner.png` — 1280×640. Mark + wordmark on Numonic's brand-dark background
+  (`#0D0114`).
 
-- `assets/icon.png`
-- `assets/banner.png`
-
-Recommended: square icon (≥ 256×256), wide banner (≈ 1280×640).
+Both derived from the production brand assets (`logo_256.png` / `brand.png`);
+regenerate from those sources if the brand refreshes rather than hand-editing
+these files.

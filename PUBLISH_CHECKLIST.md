@@ -15,13 +15,13 @@ tool, not a signing/provenance tool.
 
 ### 2. Create the GitHub repo + go-public decision
 
-- Create **`github.com/numonic-labs/comfyui-workflow-recovery`** (public,
-  company-owned; not a personal namespace).
-- Copy this staging dir into it.
-- The `Repository`, `Icon`, and `Banner` URLs in `pyproject.toml` already point
-  at that repo path — verify they resolve once the repo + `assets/` exist.
-- Add real `assets/icon.png` and `assets/banner.png` (placeholders referenced;
-  not yet created).
+- ✅ Created and pushed: `github.com/numonic-labs/comfyui-workflow-recovery`
+  (public, company-owned).
+- The `Repository`, `Icon`, and `Banner` URLs in `pyproject.toml` point at that
+  repo path.
+- ✅ `assets/icon.png` (256×256) and `assets/banner.png` (1280×640) added,
+  derived from the production brand assets. Once pushed, confirm the raw
+  GitHub URLs in `pyproject.toml` resolve.
 
 ### 3. Run the mandatory IP disclosure review
 
