@@ -1,4 +1,4 @@
-# Release Runbook — Numonic Workflow Recovery
+# Comfy Registry Publish Runbook — Numonic Workflow Recovery
 
 Step-by-step process for cutting a new version of this ComfyUI node pack.
 Follow in order. Every step here is safe to re-read before a release; nothing
