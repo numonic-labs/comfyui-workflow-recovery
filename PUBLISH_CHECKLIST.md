@@ -45,7 +45,7 @@ tool, not a signing/provenance tool.
 All 4 gates above are closed (repo live, IP review clean, PublisherId +
 secret set). For the actual release steps — version bump, tag, GitHub
 Release, watching the publish Action, and confirming Registry visibility —
-see **`docs/RELEASE-RUNBOOK.md`**, the repeatable step-by-step process for
+see **`docs/runbooks/release.md`**, the repeatable step-by-step process for
 every release, first or subsequent.
 
 "Verified" author status is automatic once GitHub repo ownership is
