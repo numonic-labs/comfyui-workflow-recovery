@@ -1,10 +1,17 @@
 # Numonic Workflow Recovery
 
-**Drop in a generated image → recover its full ComfyUI workflow lineage.**
+**Recover a ComfyUI image's workflow — and save your generations straight into
+Numonic.**
 
-Prompts, models, LoRAs, seed, sampler, and the custom nodes that made it — read
-straight out of the image your ComfyUI already saved. Lost the `.json`? Handed a
-PNG with no recipe? Recover the workflow behind any ComfyUI image.
+Two jobs in one pack:
+
+1. **Recover lineage** — prompts, models, LoRAs, seed, sampler, and the custom
+   nodes that made an image, read straight out of the PNG your ComfyUI already
+   saved. Lost the `.json`? Recover the workflow behind any ComfyUI image.
+2. **Save to Numonic** — drop-in replacements for the stock *Save Image* /
+   *Save Video* that ingest the generated **asset itself** (real bytes, with its
+   ComfyUI lineage) into your [Numonic](https://numonic.ai) library and return a
+   gallery link.
 
 A free, open-source ComfyUI custom node from [Numonic](https://numonic.ai).
 
@@ -12,21 +19,40 @@ A free, open-source ComfyUI custom node from [Numonic](https://numonic.ai).
 
 ## What it does
 
-ComfyUI embeds the full workflow into every PNG it saves (the `workflow` and
-`prompt` metadata chunks). This node reads that metadata back out:
+ComfyUI embeds the full workflow into every file it saves (the `workflow` and
+`prompt` metadata). This pack reads that back out **and** can push your outputs
+to Numonic:
 
-- **Positive / negative prompts**
-- **Checkpoints & models** used
-- **LoRAs** applied
-- **Seed & sampler**
-- **Custom nodes** the workflow depends on
-- The **raw workflow graph** as JSON
+- **Positive / negative prompts**, **checkpoints & models**, **LoRAs**,
+  **seed & sampler**, **custom nodes**, and the **raw workflow graph** as JSON.
 
-Two ways to use it:
+Three nodes + a sidebar tab:
 
-- **Sidebar tab** — drag any generated image in and read its lineage instantly.
-- **Graph node** — `Extract Workflow Lineage` outputs the recovered fields for
+- **`Extract Workflow Lineage`** (graph node) — outputs the recovered fields for
   use in a workflow (great for archiving/organizing pipelines).
+- **`Save Image to Numonic`** (graph node) — wire it where you'd wire *Save
+  Image*: the generated image is uploaded to your Numonic library with its
+  lineage, and the node returns the gallery URL.
+- **`Save Video to Numonic`** (graph node) — the same for a `VIDEO` output
+  (needs a recent ComfyUI with the native `VIDEO` type).
+- **Sidebar tab** — drag any generated image in and read its lineage instantly.
+
+### Saving to Numonic (one-time setup)
+
+The save nodes upload to your tenant using a Numonic API key read from the
+**host** (never a node widget — a widget would serialize the key into your saved
+workflows and output files). Set it once, then just run your graph:
+
+```bash
+# either an environment variable before starting ComfyUI …
+export NUMONIC_API_KEY="napi_..."
+# … or ~/.numonic/config.json:  { "api_key": "napi_..." }
+```
+
+Mint a **write**-scoped `napi_` key in Numonic → **Settings → API Keys** (there
+is a "ComfyUI node key" preset). No key set? The save nodes fail with a clear
+message telling you exactly what to do; the recovery features keep working with
+no key and no network.
 
 ## Privacy model (read this)
 
@@ -35,8 +61,8 @@ Your prompts are yours. This node is built so recovery never phones home:
 | Path | Network? | When |
 | --- | --- | --- |
 | **Local recovery** (default) | ❌ None | Always. The image is parsed **in your browser / on your machine**. Nothing is sent anywhere. |
-| **Enhanced recovery** | ✅ To Numonic | **Only if you tick the box.** Sends the image to a **read-only** service for a richer parse. It is **not stored**. |
-| **Save to Numonic** | ✅ To Numonic | **Only if you click Save** and connect your own account. Sends the recovered lineage (not the raw image). |
+| **Save Image/Video to Numonic** (graph nodes) | ✅ To Numonic | **Only if you add the node** and set `NUMONIC_API_KEY`. Uploads the generated asset to your own Numonic tenant. |
+| **Save lineage** (sidebar) | ✅ To Numonic | **Only if you click Save** and connect your own account. Sends the recovered lineage (not the raw image). |
 
 - This package contains **no secret, token, or key**. "Save to Numonic" uses a
   token **you** provide, stored only in your browser.
@@ -60,17 +86,19 @@ modules ComfyUI already ships.
 
 ## Configuration (optional)
 
-All optional; sensible defaults ship out of the box. Set as environment
-variables before starting ComfyUI:
+Set as environment variables before starting ComfyUI. Only `NUMONIC_API_KEY` is
+needed to save assets; everything else has a sensible default.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `WORKFLOW_RECOVERY_INSPECT_URL` | Enhanced-recovery endpoint | Numonic public API |
-| `WORKFLOW_RECOVERY_SAVE_URL` | Save endpoint | Numonic public API |
+| `NUMONIC_API_KEY` | `napi_` key for the *Save to Numonic* nodes (or put it in `~/.numonic/config.json`) | — |
+| `NUMONIC_APP_URL` | Numonic app host (used to build the returned gallery link) | `https://www.numonic.ai` |
+| `NUMONIC_API_URL` | Numonic REST API host | (same as `NUMONIC_APP_URL`) |
+| `WORKFLOW_RECOVERY_SAVE_URL` | Sidebar lineage-save endpoint | Numonic public API |
 | `WORKFLOW_RECOVERY_CONNECT_URL` | Account-connect page | Numonic app |
 | `WORKFLOW_RECOVERY_HTTP_TIMEOUT` | Network timeout (seconds) | `20` |
 
-To run fully offline, simply don't tick enhanced recovery and don't connect an
+To run fully offline, just don't use the save nodes and don't connect an
 account. Local recovery needs no configuration and no network.
 
 ## How this differs from adjacent nodes

@@ -1,30 +1,46 @@
-"""Graph node: Extract Workflow Lineage.
+"""Graph nodes for the Numonic pack.
 
-A real ComfyUI graph node (so the pack is Registry-native and can anchor a
-showcase template workflow). It reads the *raw file* the user selects — where
-the embedded ComfyUI metadata is still intact — and recovers the workflow
-lineage locally. Optionally, with an explicit opt-in toggle, it calls the hosted
-enhanced-recovery endpoint.
+Three nodes:
 
-Note on why this reads a file and not an ``IMAGE`` tensor: a decoded IMAGE
-tensor has no embedded PNG metadata (it is stripped at decode time). Recovery
-must operate on the original file bytes, exactly like core ``LoadImage`` does.
+  * ``Extract Workflow Lineage`` — read a saved image's embedded ComfyUI
+    metadata and recover its lineage locally (no network). Unchanged in intent;
+    the opt-in "enhanced recovery" network path was removed in Phase B.
+  * ``Save Image to Numonic`` — drop-in for the stock *Save Image*: encode the
+    ``IMAGE`` tensor to PNG (workflow embedded) and ingest it into Numonic as a
+    first-class asset, returning the gallery link.
+  * ``Save Video to Numonic`` — drop-in for *Save Video*: take a ``VIDEO`` input,
+    let ComfyUI's own ``save_to`` primitive encode it (workflow embedded),
+    upload it, then delete the temp file.
+
+The two save nodes read the API key from the **host** (env / config file) — never
+from a widget (a widget value would serialize into saved workflows and output
+files) — and run the shared three-phase upload core.
 """
 
 from __future__ import annotations
 
 import json
 import os
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
-from . import inspect_client
+from . import credential
+from . import image_encode
 from . import lineage
 from . import png_metadata
+from . import upload_client
+from . import video_save
 
 try:  # ComfyUI runtime module; absent when unit-testing this file in isolation.
     import folder_paths  # type: ignore
 except Exception:  # pragma: no cover - exercised only outside ComfyUI
     folder_paths = None
+
+CATEGORY = "Numonic"
+
+
+# ---------------------------------------------------------------------------
+# Extract Workflow Lineage (local-only recovery)
+# ---------------------------------------------------------------------------
 
 
 def _list_input_images():
@@ -51,8 +67,8 @@ def _resolve_path(image: str) -> str:
     return image
 
 
-def recover_from_file(path: str, enhanced: bool = False) -> dict:
-    """Recover lineage from a file path. Local-first; enhanced is opt-in.
+def recover_from_file(path: str) -> dict:
+    """Recover lineage from a file path. Local-first, no network.
 
     Pure enough to unit-test: give it a path to a PNG with ComfyUI metadata.
     """
@@ -63,18 +79,6 @@ def recover_from_file(path: str, enhanced: bool = False) -> dict:
         result = lineage.empty_result("local")
         result["warnings"].append("Could not read image file: %s" % exc)
         return result
-
-    if enhanced:
-        try:
-            return inspect_client.fetch_enhanced_lineage(
-                data, filename=os.path.basename(path)
-            )
-        except inspect_client.InspectError as exc:
-            # Fall back to local recovery; never fail the graph on a network error.
-            local = _local_recover(data)
-            local["warnings"].append("Enhanced recovery unavailable: %s" % exc)
-            return local
-
     return _local_recover(data)
 
 
@@ -84,8 +88,7 @@ def _local_recover(data: bytes) -> dict:
     except png_metadata.NotAPngError:
         result = lineage.empty_result("local")
         result["warnings"].append(
-            "Local recovery supports PNG metadata; this file is not a PNG. "
-            "Use enhanced recovery for other formats."
+            "Local recovery supports PNG metadata; this file is not a PNG."
         )
         return result
     return lineage.normalize_embedded_metadata(
@@ -94,9 +97,9 @@ def _local_recover(data: bytes) -> dict:
 
 
 class ExtractWorkflowLineage:
-    """Recover the full ComfyUI lineage embedded in a saved image."""
+    """Recover the full ComfyUI lineage embedded in a saved image (local)."""
 
-    CATEGORY = "Numonic/Workflow Recovery"
+    CATEGORY = CATEGORY + "/Workflow Recovery"
     FUNCTION = "recover"
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING", "STRING")
     RETURN_NAMES = (
@@ -116,24 +119,10 @@ class ExtractWorkflowLineage:
             image_widget = (images, {"image_upload": True})
         else:  # allows the node to load even before any image is uploaded
             image_widget = ("STRING", {"default": "", "multiline": False})
-        return {
-            "required": {
-                "image": image_widget,
-            },
-            "optional": {
-                "enhanced_recovery": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "label_on": "enhanced (sends image to Numonic)",
-                        "label_off": "local only",
-                    },
-                ),
-            },
-        }
+        return {"required": {"image": image_widget}}
 
-    def recover(self, image: str, enhanced_recovery: bool = False) -> Tuple[str, ...]:
-        result = recover_from_file(_resolve_path(image), enhanced=enhanced_recovery)
+    def recover(self, image: str) -> Tuple[str, ...]:
+        result = recover_from_file(_resolve_path(image))
         prompts = result.get("prompts", {})
         return (
             prompts.get("positive", ""),
@@ -145,10 +134,160 @@ class ExtractWorkflowLineage:
         )
 
 
+# ---------------------------------------------------------------------------
+# Save Image to Numonic
+# ---------------------------------------------------------------------------
+
+
+def _raise_from_upload(exc: Exception) -> None:
+    """Re-raise upload/credential failures as a clear graph error."""
+    if isinstance(exc, credential.MissingCredentialError):
+        raise RuntimeError(str(exc))
+    if isinstance(exc, upload_client.UploadError):
+        raise RuntimeError(str(exc))
+    raise exc
+
+
+class SaveImageToNumonic:
+    """Ingest a generated IMAGE into Numonic as a first-class asset."""
+
+    CATEGORY = CATEGORY
+    FUNCTION = "save"
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("gallery_url",)
+    OUTPUT_NODE = True
+    DESCRIPTION = (
+        "Save the generated image to your Numonic library (with ComfyUI "
+        "lineage) and return its gallery link. Set NUMONIC_API_KEY on the host."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {"images": ("IMAGE",)},
+            "optional": {
+                "filename_prefix": (
+                    "STRING",
+                    {"default": "numonic", "multiline": False},
+                ),
+            },
+            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+        }
+
+    def save(
+        self,
+        images,
+        filename_prefix: str = "numonic",
+        prompt=None,
+        extra_pnginfo=None,
+    ) -> Dict[str, Any]:
+        api_key = credential.require_api_key()
+        urls = []
+        try:
+            for index, image in enumerate(images):
+                png_bytes = image_encode.tensor_to_png_bytes(
+                    image, prompt=prompt, extra_pnginfo=extra_pnginfo
+                )
+                filename = "%s_%05d.png" % (filename_prefix or "numonic", index)
+                result = upload_client.upload_asset(
+                    png_bytes,
+                    filename=filename,
+                    mime_type="image/png",
+                    api_key=api_key,
+                )
+                urls.append(result["gallery_url"])
+        except Exception as exc:  # map to a clean graph error
+            _raise_from_upload(exc)
+
+        text = "Saved to Numonic:\n" + "\n".join(urls) if urls else "No image saved."
+        return {"ui": {"text": [text]}, "result": (urls[0] if urls else "",)}
+
+
+# ---------------------------------------------------------------------------
+# Save Video to Numonic
+# ---------------------------------------------------------------------------
+
+
+class SaveVideoToNumonic:
+    """Ingest a generated VIDEO into Numonic as a first-class asset."""
+
+    CATEGORY = CATEGORY
+    FUNCTION = "save"
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("gallery_url",)
+    OUTPUT_NODE = True
+    DESCRIPTION = (
+        "Save the generated video to your Numonic library (with ComfyUI "
+        "lineage) and return its gallery link. Needs a recent ComfyUI with the "
+        "native VIDEO type. Set NUMONIC_API_KEY on the host."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {"video": ("VIDEO",)},
+            "optional": {
+                "filename_prefix": (
+                    "STRING",
+                    {"default": "numonic", "multiline": False},
+                ),
+                "format": (["auto", "mp4", "webm"], {"default": "auto"}),
+                "codec": (["auto", "h264", "vp9"], {"default": "auto"}),
+            },
+            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+        }
+
+    def save(
+        self,
+        video,
+        filename_prefix: str = "numonic",
+        format: str = "auto",
+        codec: str = "auto",
+        prompt=None,
+        extra_pnginfo=None,
+    ) -> Dict[str, Any]:
+        api_key = credential.require_api_key()
+
+        try:
+            tmp_path, mime_type = video_save.save_video_to_tmp(
+                video,
+                prompt=prompt,
+                extra_pnginfo=extra_pnginfo,
+                fmt=format,
+                codec=codec,
+            )
+        except video_save.VideoUnsupportedError as exc:
+            raise RuntimeError(str(exc))
+
+        try:
+            with open(tmp_path, "rb") as handle:
+                data = handle.read()
+            ext = os.path.splitext(tmp_path)[1].lstrip(".") or "mp4"
+            filename = "%s.%s" % (filename_prefix or "numonic", ext)
+            try:
+                result = upload_client.upload_asset(
+                    data,
+                    filename=filename,
+                    mime_type=mime_type,
+                    api_key=api_key,
+                )
+            except Exception as exc:
+                _raise_from_upload(exc)
+        finally:
+            video_save._safe_unlink(tmp_path)  # delete the transient temp file
+
+        text = "Saved to Numonic:\n" + result["gallery_url"]
+        return {"ui": {"text": [text]}, "result": (result["gallery_url"],)}
+
+
 NODE_CLASS_MAPPINGS = {
     "NumonicExtractWorkflowLineage": ExtractWorkflowLineage,
+    "NumonicSaveImageToNumonic": SaveImageToNumonic,
+    "NumonicSaveVideoToNumonic": SaveVideoToNumonic,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "NumonicExtractWorkflowLineage": "Extract Workflow Lineage",
+    "NumonicSaveImageToNumonic": "Save Image to Numonic",
+    "NumonicSaveVideoToNumonic": "Save Video to Numonic",
 }
