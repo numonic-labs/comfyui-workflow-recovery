@@ -28,6 +28,18 @@ immutable.
     video extractor recovers lineage; guarded by a `save_to` presence check with
     a clear "update ComfyUI" message on older builds.
 
+### Fixed
+
+- **Seed recovery on modern Flux / custom-sampling workflows.** Local recovery
+  read the seed only from the classic `KSampler.seed` input, so workflows using
+  `RandomNoise` → `SamplerCustomAdvanced` (the dominant Flux pattern, incl.
+  Flux 2) reported `seed: null` even though the seed was embedded in the image.
+  Both parsers now also read `RandomNoise.noise_seed` — `lineage.py` (graph
+  node) and `web/workflow_recovery.js` (sidebar) — so they stay in parity.
+  Verified against a real Flux 2 dev generation. Classic `KSampler` recovery is
+  unchanged. A `noise_seed` supplied via a *link* from another node still does
+  not resolve (graph-link following remains out of scope).
+
 ### Removed
 
 - **Enhanced recovery** (hosted image-inspect) — `inspect_client.py`, the

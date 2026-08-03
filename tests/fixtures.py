@@ -91,6 +91,45 @@ def sample_prompt() -> dict:
     }
 
 
+def flux_prompt() -> dict:
+    """A modern Flux / custom-sampling API prompt.
+
+    Modeled on a real ``Flux 2 dev`` generation (ComfyUI default Flux 2 template):
+    the seed lives on ``RandomNoise.noise_seed`` (not ``KSampler.seed``), the
+    sampler on ``KSamplerSelect``, and ``SamplerCustomAdvanced`` links them.
+    Regression guard for the noise_seed recovery fix.
+    """
+    return {
+        "12": {
+            "class_type": "UNETLoader",
+            "inputs": {"unet_name": "flux2_dev_fp8mixed.safetensors"},
+        },
+        "6": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "high fashion, vintage couture, street photography"},
+        },
+        "16": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "25": {"class_type": "RandomNoise", "inputs": {"noise_seed": 1027111520328378}},
+        "13": {
+            "class_type": "SamplerCustomAdvanced",
+            "inputs": {"noise": ["25", 0], "sampler": ["16", 0]},
+        },
+        "101": {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "lora_name": "Flux_2-Turbo-LoRA_comfyui.safetensors",
+                "model": ["12", 0],
+            },
+        },
+        "26": {"class_type": "FluxGuidance", "inputs": {"guidance": 4.0}},
+    }
+
+
+def flux_png() -> bytes:
+    """A PNG carrying the Flux (noise_seed) prompt as uncompressed tEXt."""
+    return make_png(text_chunks={"prompt": json.dumps(flux_prompt())})
+
+
 def sample_workflow() -> dict:
     """A minimal UI-graph chunk."""
     return {"last_node_id": 12, "nodes": [], "links": [], "version": 0.4}

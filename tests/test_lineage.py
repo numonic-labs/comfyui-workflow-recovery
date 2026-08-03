@@ -65,6 +65,32 @@ class LocalNormalizationTests(unittest.TestCase):
         self.assertTrue(result["recovered"])
 
 
+class FluxNoiseSeedTests(unittest.TestCase):
+    """Regression: recover the seed from ``RandomNoise.noise_seed`` (Flux /
+    custom-sampling), not only ``KSampler.seed``. Guards the gap confirmed on a
+    real Flux 2 dev image (seed 1027111520328378 was dropped before the fix)."""
+
+    def test_seed_recovered_from_noise_seed(self):
+        result = lineage.normalize_embedded_metadata(None, json.dumps(fixtures.flux_prompt()))
+        self.assertTrue(result["recovered"])
+        self.assertEqual(result["seed"], 1027111520328378)
+        self.assertEqual(result["sampler"], "euler")
+        self.assertEqual(result["models"], ["flux2_dev_fp8mixed.safetensors"])
+        self.assertEqual(result["loras"], ["Flux_2-Turbo-LoRA_comfyui.safetensors"])
+
+    def test_classic_seed_preferred_over_noise_seed_within_a_node(self):
+        prompt = {"1": {"class_type": "KSampler", "inputs": {"seed": 5, "noise_seed": 9}}}
+        result = lineage.normalize_embedded_metadata(None, json.dumps(prompt))
+        self.assertEqual(result["seed"], 5)
+
+    def test_linked_noise_seed_is_ignored_not_crashing(self):
+        # A noise_seed wired from another node is a link list, not an int; it must
+        # be skipped (link resolution is a separate, larger enhancement), no crash.
+        prompt = {"1": {"class_type": "RandomNoise", "inputs": {"noise_seed": ["9", 0]}}}
+        result = lineage.normalize_embedded_metadata(None, json.dumps(prompt))
+        self.assertIsNone(result["seed"])
+
+
 class CoerceContractTests(unittest.TestCase):
     def test_fills_missing_keys(self):
         result = lineage.coerce_contract({"recovered": True}, mode="enhanced")

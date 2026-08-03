@@ -25,6 +25,15 @@ class NodeRecoveryTests(unittest.TestCase):
         self.assertEqual(result["mode"], "local")
         self.assertEqual(result["models"], ["sd_xl_base_1.0.safetensors"])
 
+    def test_recovers_seed_from_noise_seed_flux(self):
+        # End-to-end file path for a modern Flux workflow: the seed lives on
+        # RandomNoise.noise_seed, not KSampler.seed. Regression for the fix.
+        path = self._write(fixtures.flux_png())
+        result = nodes.recover_from_file(path)
+        self.assertTrue(result["recovered"])
+        self.assertEqual(result["seed"], 1027111520328378)
+        self.assertEqual(result["sampler"], "euler")
+
     def test_non_png_local_is_graceful(self):
         path = self._write(b"i am a jpeg, honest")
         result = nodes.recover_from_file(path)

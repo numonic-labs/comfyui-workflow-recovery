@@ -78,6 +78,11 @@ _CORE_NODE_TYPES = frozenset(
 # checkpoint / model file name.
 _MODEL_INPUT_KEYS = ("ckpt_name", "unet_name", "model_name", "model")
 _LORA_INPUT_KEYS = ("lora_name",)
+# The seed lives on ``seed`` for classic samplers (``KSampler``), but on
+# ``noise_seed`` for the modern Flux / custom-sampling pattern where a
+# ``RandomNoise`` node feeds ``SamplerCustomAdvanced``. Read both so seeds are
+# recovered on Flux workflows, not just classic ones.
+_SEED_INPUT_KEYS = ("seed", "noise_seed")
 _POSITIVE_HINTS = ("positive", "pos")
 _NEGATIVE_HINTS = ("negative", "neg")
 
@@ -173,9 +178,11 @@ def _extract_from_prompt(prompt_obj: Any, result: Dict[str, Any]) -> None:
                 loras.append(val)
 
         if result["seed"] is None:
-            seed = inputs.get("seed")
-            if isinstance(seed, (int, float)) and not isinstance(seed, bool):
-                result["seed"] = int(seed)
+            for key in _SEED_INPUT_KEYS:
+                seed = inputs.get(key)
+                if isinstance(seed, (int, float)) and not isinstance(seed, bool):
+                    result["seed"] = int(seed)
+                    break
         if result["sampler"] is None:
             sampler = inputs.get("sampler_name")
             if isinstance(sampler, str) and sampler:

@@ -109,6 +109,9 @@ const CORE_NODES = new Set([
   "RepeatLatentBatch", "PrimitiveNode", "Note", "Reroute",
 ]);
 const MODEL_KEYS = ["ckpt_name", "unet_name", "model_name", "model"];
+// `seed` is the classic-KSampler key; `noise_seed` is the modern Flux /
+// SamplerCustomAdvanced (RandomNoise) key. Read both. Mirrors lineage.py.
+const SEED_KEYS = ["seed", "noise_seed"];
 
 function tryParse(value) {
   if (value == null) return null;
@@ -148,7 +151,7 @@ function normalizeLocal(workflowRaw, promptRaw) {
       const inputs = node.inputs || {};
       for (const k of MODEL_KEYS) if (typeof inputs[k] === "string") models.push(inputs[k]);
       if (typeof inputs.lora_name === "string") loras.push(inputs.lora_name);
-      if (result.seed == null && typeof inputs.seed === "number") result.seed = inputs.seed;
+      if (result.seed == null) for (const k of SEED_KEYS) if (typeof inputs[k] === "number") { result.seed = inputs[k]; break; }
       if (result.sampler == null && typeof inputs.sampler_name === "string") result.sampler = inputs.sampler_name;
       if (ct === "CLIPTextEncode" && typeof inputs.text === "string" && inputs.text.trim()) {
         const title = (node._meta?.title || "").toLowerCase();
