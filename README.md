@@ -54,6 +54,34 @@ is a "ComfyUI node key" preset). No key set? The save nodes fail with a clear
 message telling you exactly what to do; the recovery features keep working with
 no key and no network.
 
+### Where to wire it
+
+**The save nodes are siblings of the stock save nodes, not successors.** They take
+the same input the built-in *Save Image* / *Save Video* take, so you wire them from
+the same place — either **instead of** the stock node (Numonic-only) or **alongside
+it** (ComfyUI happily fans one output into several inputs, so you get a local file
+*and* the upload):
+
+```
+                      ┌─→ Save Image                (writes a file — terminal)
+… → VAE Decode ─IMAGE─┤
+                      └─→ Save Image to Numonic     (uploads — terminal)
+
+                      ┌─→ Save Video                (writes a file — terminal)
+CreateVideo ────VIDEO─┤
+ (or Load Video)      └─→ Save Video to Numonic     (uploads — terminal)
+```
+
+- **`Save Image to Numonic`** takes an `IMAGE`, so it goes wherever *Save Image*
+  goes — typically straight off **VAE Decode**.
+- **`Save Video to Numonic`** takes a `VIDEO`, so it goes wherever *Save Video*
+  goes — off **Create Video** (the usual generative case: a model produces `IMAGE`
+  frames, `Create Video` turns them into a `VIDEO`) or off **Load Video** (to push
+  an existing video file into Numonic with its embedded lineage).
+- You **cannot** chain ours *after* a stock *Save Image* / *Save Video*: those are
+  terminal output nodes with no output socket. Put ours next to them, not behind
+  them.
+
 ## Privacy model (read this)
 
 Your prompts are yours. This node is built so recovery never phones home:
