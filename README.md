@@ -1,105 +1,35 @@
 # Numonic Workflow Recovery
 
-**Recover a ComfyUI image's workflow — and save your generations straight into
-Numonic.**
+**Save your ComfyUI generations straight into [Numonic](https://numonic.ai) — and
+recover the workflow behind any ComfyUI image.**
 
-Two jobs in one pack:
+A free, open-source ComfyUI custom node pack from [Numonic](https://numonic.ai).
 
-1. **Recover lineage** — prompts, models, LoRAs, seed, sampler, and the custom
-   nodes that made an image, read straight out of the PNG your ComfyUI already
-   saved. Lost the `.json`? Recover the workflow behind any ComfyUI image.
-2. **Save to Numonic** — drop-in replacements for the stock *Save Image* /
-   *Save Video* that ingest the generated **asset itself** (real bytes, with its
-   ComfyUI lineage) into your [Numonic](https://numonic.ai) library and return a
-   gallery link.
-
-A free, open-source ComfyUI custom node from [Numonic](https://numonic.ai).
+- **Save to Numonic** — drop-in replacements for the stock *Save Image* / *Save
+  Video*. When your graph runs, the generated asset itself (real bytes, with its
+  ComfyUI workflow embedded) lands in your Numonic library, and the node hands you
+  the gallery link.
+- **Recover lineage** — prompts, models, LoRAs, seed, sampler and custom nodes,
+  read straight out of a PNG ComfyUI already saved. Lost the `.json`? Recover it.
 
 ---
 
-## What it does
+## Contents
 
-ComfyUI embeds the full workflow into every file it saves (the `workflow` and
-`prompt` metadata). This pack reads that back out **and** can push your outputs
-to Numonic:
+1. [Install](#1-install)
+2. [Connect your Numonic account](#2-connect-your-numonic-account) ← the one setup step
+3. [Use the save nodes](#3-use-the-save-nodes)
+4. [Recover a workflow from an image](#4-recover-a-workflow-from-an-image)
+5. [Troubleshooting](#5-troubleshooting)
+6. [Privacy model](#6-privacy-model)
+7. [Configuration reference](#7-configuration-reference)
 
-- **Positive / negative prompts**, **checkpoints & models**, **LoRAs**,
-  **seed & sampler**, **custom nodes**, and the **raw workflow graph** as JSON.
+---
 
-Three nodes + a sidebar tab:
+## 1. Install
 
-- **`Extract Workflow Lineage`** (graph node) — outputs the recovered fields for
-  use in a workflow (great for archiving/organizing pipelines).
-- **`Save Image to Numonic`** (graph node) — wire it where you'd wire *Save
-  Image*: the generated image is uploaded to your Numonic library with its
-  lineage, and the node returns the gallery URL.
-- **`Save Video to Numonic`** (graph node) — the same for a `VIDEO` output
-  (needs a recent ComfyUI with the native `VIDEO` type).
-- **Sidebar tab** — drag any generated image in and read its lineage instantly.
-
-### Saving to Numonic (one-time setup)
-
-The save nodes upload to your tenant using a Numonic API key read from the
-**host** (never a node widget — a widget would serialize the key into your saved
-workflows and output files). Set it once, then just run your graph:
-
-```bash
-# either an environment variable before starting ComfyUI …
-export NUMONIC_API_KEY="napi_..."
-# … or ~/.numonic/config.json:  { "api_key": "napi_..." }
-```
-
-Mint a **write**-scoped `napi_` key in Numonic → **Settings → API Keys** (there
-is a "ComfyUI node key" preset). No key set? The save nodes fail with a clear
-message telling you exactly what to do; the recovery features keep working with
-no key and no network.
-
-### Where to wire it
-
-**The save nodes are siblings of the stock save nodes, not successors.** They take
-the same input the built-in *Save Image* / *Save Video* take, so you wire them from
-the same place — either **instead of** the stock node (Numonic-only) or **alongside
-it** (ComfyUI happily fans one output into several inputs, so you get a local file
-*and* the upload):
-
-```
-                      ┌─→ Save Image                (writes a file — terminal)
-… → VAE Decode ─IMAGE─┤
-                      └─→ Save Image to Numonic     (uploads — terminal)
-
-                      ┌─→ Save Video                (writes a file — terminal)
-CreateVideo ────VIDEO─┤
- (or Load Video)      └─→ Save Video to Numonic     (uploads — terminal)
-```
-
-- **`Save Image to Numonic`** takes an `IMAGE`, so it goes wherever *Save Image*
-  goes — typically straight off **VAE Decode**.
-- **`Save Video to Numonic`** takes a `VIDEO`, so it goes wherever *Save Video*
-  goes — off **Create Video** (the usual generative case: a model produces `IMAGE`
-  frames, `Create Video` turns them into a `VIDEO`) or off **Load Video** (to push
-  an existing video file into Numonic with its embedded lineage).
-- You **cannot** chain ours *after* a stock *Save Image* / *Save Video*: those are
-  terminal output nodes with no output socket. Put ours next to them, not behind
-  them.
-
-## Privacy model (read this)
-
-Your prompts are yours. This node is built so recovery never phones home:
-
-| Path | Network? | When |
-| --- | --- | --- |
-| **Local recovery** (default) | ❌ None | Always. The image is parsed **in your browser / on your machine**. Nothing is sent anywhere. |
-| **Save Image/Video to Numonic** (graph nodes) | ✅ To Numonic | **Only if you add the node** and set `NUMONIC_API_KEY`. Uploads the generated asset to your own Numonic tenant. |
-| **Save lineage** (sidebar) | ✅ To Numonic | **Only if you click Save** and connect your own account. Sends the recovered lineage (not the raw image). |
-
-- This package contains **no secret, token, or key**. "Save to Numonic" uses a
-  token **you** provide, stored only in your browser.
-- With no account connected, everything stays 100% local.
-
-## Install
-
-**From ComfyUI-Manager** (recommended): search for *Numonic Workflow Recovery*
-and click Install.
+**From ComfyUI-Manager** (recommended): search for *Numonic Workflow Recovery* →
+**Install** → restart ComfyUI.
 
 **Manually:**
 
@@ -109,37 +39,251 @@ git clone https://github.com/numonic-labs/comfyui-workflow-recovery
 # restart ComfyUI
 ```
 
-No dependencies to install — the node uses only the Python standard library and
-modules ComfyUI already ships.
+**No dependencies to install** — the pack uses only the Python standard library and
+modules ComfyUI already ships. After restarting, ComfyUI's log lists the pack under
+*"Import times for custom nodes"* with no error.
 
-## Configuration (optional)
+You now have three nodes (under the **Numonic** category) and a sidebar tab:
 
-Set as environment variables before starting ComfyUI. Only `NUMONIC_API_KEY` is
-needed to save assets; everything else has a sensible default.
+| Node | Takes | Does |
+| --- | --- | --- |
+| **Save Image to Numonic** | `IMAGE` | Uploads the image (with lineage) → returns `gallery_url` |
+| **Save Video to Numonic** | `VIDEO` | Uploads the video (with lineage) → returns `gallery_url` |
+| **Extract Workflow Lineage** | an image file | Outputs the recovered prompts / models / LoRAs / custom nodes / JSON |
+
+Recovery works immediately with no account and no network. Saving needs one setup
+step — next.
+
+---
+
+## 2. Connect your Numonic account
+
+The save nodes authenticate with a Numonic API key that they read **from the machine
+running ComfyUI** — never from a node widget, because a widget value would be
+serialized into your saved workflows *and* embedded into your output files, leaking
+the key to anyone you share them with.
+
+### 2.1 Get a key
+
+In Numonic: **Settings → API Keys → New key**, using the **"ComfyUI node key"**
+preset (or any key with `write` or `comfy-ingest` scope). Copy the `napi_…` value.
+
+### 2.2 Give the key to ComfyUI — pick ONE of these
+
+> **⚠️ The one thing that trips people up:** an environment variable you type in a
+> terminal is only visible to programs launched **from that same terminal**. If you
+> start ComfyUI by double-clicking a `.bat`, from a desktop shortcut, from **ComfyUI
+> Desktop**, or as a background service, it will **not** see it — and the node will
+> report "No Numonic API key found". If in doubt, use **Option A**, which works no
+> matter how ComfyUI is started.
+
+#### Option A — config file (recommended, works everywhere)
+
+Create a file called `config.json` in a `.numonic` folder inside your home
+directory, containing:
+
+```json
+{ "api_key": "napi_..." }
+```
+
+| Platform | Full path |
+| --- | --- |
+| **Windows** | `C:\Users\<your-name>\.numonic\config.json` |
+| **macOS** | `/Users/<your-name>/.numonic/config.json` |
+| **Linux** | `/home/<your-name>/.numonic/config.json` |
+
+<details>
+<summary>Create it from a terminal (copy-paste)</summary>
+
+**Windows (PowerShell):**
+```powershell
+mkdir "$env:USERPROFILE\.numonic" -Force
+'{ "api_key": "napi_..." }' | Out-File -Encoding utf8 "$env:USERPROFILE\.numonic\config.json"
+```
+
+**macOS / Linux:**
+```bash
+mkdir -p ~/.numonic
+printf '{ "api_key": "napi_..." }\n' > ~/.numonic/config.json
+chmod 600 ~/.numonic/config.json    # optional: make it readable only by you
+```
+</details>
+
+#### Option B — environment variable
+
+Best when you launch ComfyUI from a terminal or run it as a service.
+
+**Windows — ComfyUI portable (`run_nvidia_gpu.bat`):** open the `.bat` in a text
+editor and add this line *above* the line that starts `python`:
+
+```bat
+set NUMONIC_API_KEY=napi_...
+```
+
+**Windows — persistent, for any launcher:** run once, then **sign out and back in**
+(`setx` does not affect already-running programs or the current window):
+
+```bat
+setx NUMONIC_API_KEY "napi_..."
+```
+
+**Windows — current PowerShell session only:**
+```powershell
+$env:NUMONIC_API_KEY = "napi_..."
+```
+
+**macOS / Linux — terminal launch:** export it, then start ComfyUI *from that same
+terminal*:
+```bash
+export NUMONIC_API_KEY="napi_..."
+python main.py
+```
+To make it permanent, add that `export` line to `~/.bashrc` / `~/.zshrc`.
+
+<details>
+<summary>Linux — ComfyUI running as a <code>systemd</code> service</summary>
+
+A shell `export` will **not** reach a service. Give it the variable explicitly:
+
+```bash
+sudo mkdir -p /etc/systemd/system/comfyui.service.d
+sudo tee /etc/systemd/system/comfyui.service.d/numonic.conf >/dev/null <<'CONF'
+[Service]
+Environment=NUMONIC_API_KEY=napi_...
+CONF
+sudo systemctl daemon-reload
+sudo systemctl restart comfyui.service
+```
+(Replace `comfyui.service` with your unit name.)
+</details>
+
+### 2.3 Restart ComfyUI
+
+The key is read by the ComfyUI process, so **restart it** after setting either
+option. Then run a graph with a save node — success shows a `gallery_url`; any
+problem is reported in plain language (see [Troubleshooting](#5-troubleshooting)).
+
+---
+
+## 3. Use the save nodes
+
+**The save nodes are siblings of the stock save nodes, not successors.** They take
+the same input the built-in *Save Image* / *Save Video* take, so wire them from the
+same place — either **instead of** the stock node (Numonic-only) or **alongside it**
+(ComfyUI fans one output into several inputs, so you get a local file *and* the
+upload):
+
+```
+                      ┌─→ Save Image                (writes a file — terminal)
+… → VAE Decode ─IMAGE─┤
+                      └─→ Save Image to Numonic     (uploads — terminal)
+
+                      ┌─→ Save Video                (writes a file — terminal)
+Create Video ───VIDEO─┤
+ (or Load Video)      └─→ Save Video to Numonic     (uploads — terminal)
+```
+
+- **Save Image to Numonic** takes an `IMAGE` — typically straight off **VAE Decode**.
+- **Save Video to Numonic** takes a `VIDEO` — off **Create Video** (the usual
+  generative case: a model produces `IMAGE` frames and *Create Video* turns them
+  into a `VIDEO`) or off **Load Video** (to push an existing video file into Numonic).
+- You **cannot** chain ours *after* a stock *Save Image* / *Save Video*: those are
+  terminal nodes with no output socket. Put ours next to them, not behind them.
+
+**Optional inputs:** `filename_prefix` (default `numonic`), and for video
+`format` / `codec` (both default `auto` — ComfyUI picks). The `prompt` and
+`workflow` are captured automatically; there is nothing to wire for lineage.
+
+**Output:** a `gallery_url` string. Wire it into any "show text" node to see it on
+the canvas, or just open your Numonic gallery — the asset is there, with its
+workflow lineage (prompts, models, LoRAs, seed, sampler) already extracted.
+
+> **Video needs a recent ComfyUI** — the one with the native `VIDEO` type (the same
+> one that has *Create Video* / *Save Video*). On older builds the video node's input
+> socket won't resolve, and the node fails with a clear "update ComfyUI" message.
+> *Save Image to Numonic* has no such requirement.
+
+---
+
+## 4. Recover a workflow from an image
+
+Two ways, both entirely local — nothing leaves your machine:
+
+- **Sidebar tab** — open the *Workflow Recovery* tab and drop in any generated
+  image to read its lineage instantly.
+- **`Extract Workflow Lineage` node** — point it at an image in your input folder;
+  it outputs positive/negative prompts, models, LoRAs, custom nodes and the raw
+  workflow JSON as strings you can use elsewhere in a graph.
+
+Reads ComfyUI's `workflow` / `prompt` PNG metadata, including compressed (`zTXt` /
+`iTXt`) chunks that some tools miss.
+
+---
+
+## 5. Troubleshooting
+
+| What you see | What it means | Fix |
+| --- | --- | --- |
+| `No Numonic API key found` | The ComfyUI **process** can't see your key — almost always an environment variable set in a terminal while ComfyUI was launched some other way | Use [Option A, the config file](#option-a--config-file-recommended-works-everywhere), then restart ComfyUI |
+| `Numonic rejected the API key (HTTP 401/403)` | Key is wrong, revoked, or lacks scope | Mint a fresh key with `write` or `comfy-ingest` scope; check for stray spaces/quotes |
+| `Your Numonic storage is full (HTTP 413)` | Tenant storage limit reached | Free up space or raise the limit, then re-run |
+| `Numonic is rate-limiting uploads (HTTP 429)` | Too many uploads too fast | Wait a moment and re-run |
+| `…has no native save_to() primitive` / video node won't connect | ComfyUI predates the native `VIDEO` type | Update ComfyUI, or use *Save Image to Numonic* |
+| `Numonic is unreachable` | Network/DNS/proxy problem, or a wrong host override | Check connectivity; unset `NUMONIC_API_URL` unless you deliberately set it |
+
+The nodes never fail silently: every problem surfaces as a readable error in the
+ComfyUI UI and log.
+
+---
+
+## 6. Privacy model
+
+Your prompts are yours. Recovery never phones home:
+
+| Path | Network? | When |
+| --- | --- | --- |
+| **Local recovery** (sidebar + `Extract Workflow Lineage`) | ❌ None | Always. Parsed on your machine / in your browser. Nothing is sent anywhere. |
+| **Save Image / Video to Numonic** (graph nodes) | ✅ To Numonic | Only if you add the node **and** configure a key. Uploads the asset to **your own** Numonic tenant. |
+| **Save lineage** (sidebar button) | ✅ To Numonic | Only if you click Save and connect an account. Sends the recovered lineage — never the raw image. |
+
+- This package contains **no secret, token, or key of its own.** The save nodes use
+  the key *you* place on your machine; the sidebar save uses a token *you* paste,
+  stored only in your browser. Neither is ever written into a workflow or an output
+  file.
+- With no key configured, everything stays 100% local.
+
+---
+
+## 7. Configuration reference
+
+Only `NUMONIC_API_KEY` is needed. Everything else is optional and has a sensible
+default.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `NUMONIC_API_KEY` | `napi_` key for the *Save to Numonic* nodes (or put it in `~/.numonic/config.json`) | — |
-| `NUMONIC_APP_URL` | Numonic app host (used to build the returned gallery link) | `https://www.numonic.ai` |
-| `NUMONIC_API_URL` | Numonic REST API host | (same as `NUMONIC_APP_URL`) |
-| `WORKFLOW_RECOVERY_SAVE_URL` | Sidebar lineage-save endpoint | Numonic public API |
-| `WORKFLOW_RECOVERY_CONNECT_URL` | Account-connect page | Numonic app |
-| `WORKFLOW_RECOVERY_HTTP_TIMEOUT` | Network timeout (seconds) | `20` |
+| `NUMONIC_API_KEY` | Your `napi_` key (or use `~/.numonic/config.json`) | — |
+| `NUMONIC_APP_URL` | Numonic app host, used for the returned gallery link | `https://www.numonic.ai` |
+| `NUMONIC_API_URL` | Numonic REST API host — only change this to target a self-hosted or staging instance | same as `NUMONIC_APP_URL` |
+| `WORKFLOW_RECOVERY_HTTP_TIMEOUT` | Network timeout, seconds | `20` |
+| `WORKFLOW_RECOVERY_SAVE_URL` | Endpoint for the sidebar's lineage-save button | Numonic public API |
+| `WORKFLOW_RECOVERY_CONNECT_URL` | Account-connect page opened by the sidebar | Numonic app |
 
-To run fully offline, just don't use the save nodes and don't connect an
-account. Local recovery needs no configuration and no network.
+The config file accepts the same host overrides as keys: `api_key`, `app_url`,
+`api_url`.
+
+---
 
 ## How this differs from adjacent nodes
 
 - **vs. ComfyUI_PNGInfo_Sidebar / Crystools metadata tools** — those show raw
-  embedded metadata. This node *normalizes* it into a structured lineage
-  (models / LoRAs / custom-node list / prompts) and adds an optional path to
-  archive it to an asset manager. Local-first parsing is shared prior art; the
-  normalization + opt-in save funnel is what's new here.
+  embedded metadata. This pack *normalizes* it into a structured lineage (models /
+  LoRAs / custom nodes / prompts) and adds a first-class path to archive the asset
+  itself into an asset manager. Local-first parsing is shared prior art; the
+  normalization and the save nodes are what's new.
 - **It does not sign anything.** This recovers existing metadata; it is not a
-  C2PA/provenance *signer*. (Naming is deliberate — it does what it says.)
-- **It does not use execution hooks.** Recovery reads saved-image metadata only,
-  so it is unaffected by ComfyUI execution-model changes.
+  C2PA/provenance *signer*. (The naming is deliberate — it does what it says.)
+- **It does not use execution hooks.** Recovery reads saved-file metadata only, so
+  it is unaffected by ComfyUI execution-model changes.
 
 ## License
 

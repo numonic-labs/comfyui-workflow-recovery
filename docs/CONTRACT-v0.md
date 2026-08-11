@@ -1,31 +1,122 @@
-# Shared inspect contract v0 (node ⇄ hosted endpoint)
+# Integration contracts (node ⇄ Numonic)
 
-This node builds against **contract v0** owned by the private `comfy-inspect`
-service, a separately-hosted Numonic endpoint. It is mirrored here so the
-node's integration point is explicit. **The hosted service is the source of
-truth**; if the two drift, the service wins and this node adapts at
-integration.
+The surfaces this node talks to. **The hosted service is the source of truth**; if
+the two drift, the service wins and this node adapts.
 
-## Enhanced-recovery request (opt-in only)
+Two network surfaces exist, both opt-in, plus a fully local path that needs no
+network at all.
+
+---
+
+## 1. Asset save — the `Save Image/Video to Numonic` nodes
+
+The primary integration. Three phases; the node holds no secret of its own and
+authenticates with a `napi_` key read from the host (see the README, "Connect your
+Numonic account"). The tenant is resolved **server-side from the key** — the node
+never supplies a tenant.
+
+An API key with `write` **or** `comfy-ingest` scope is accepted.
+
+### Phase 1 — request a signed upload URL
 
 ```
-POST <inspect_url>                       # default: https://api.numonic.ai/v1/comfy-inspect
-Content-Type: multipart/form-data
-  image=<file>                           # the generated image
-  include_raw=true|false                 # optional; include raw prompt JSON
+POST <api_base>/api/v1/comfy-lineage/asset/signed-url
+Authorization: Bearer napi_…
+Content-Type: application/json
+  { "filename": "numonic_00000.png", "contentType": "image/png" }
+
+→ 200 { "signedUrl": "https://…", "token": "…", "path": "<tenant-scoped storage path>" }
 ```
 
-The node also plans to support `{ "image_url": "..." }` JSON bodies if the
-hosted service offers it; the MVP node sends multipart only.
+### Phase 2 — upload the bytes straight to storage
 
-## Response (200)
+```
+PUT <signedUrl>
+Content-Type: <the same mime type>
+  <raw file bytes>
+```
+
+Bytes go **directly to storage**, never through the web tier — this is what keeps
+large video uploads clear of request-body size limits. The presigned URL carries its
+own authorization; the `napi_` key is deliberately **not** sent here.
+
+### Phase 3 — confirm, extract lineage, create the asset
+
+```
+POST <api_base>/api/v1/import/comfyui/confirm-upload
+Authorization: Bearer napi_…
+Content-Type: application/json
+  { "path": "<path from phase 1>", "filename": "…", "fileSize": 12345, "mimeType": "image/png" }
+
+→ 200 {
+    "success": true,
+    "url": "https://www.numonic.ai/app/assets/<assetH>",   // gallery deep-link
+    "asset": { "assetH": "…", "filename": "…", "fileSize": 123, "toolName": "ComfyUI", … },
+    "metadata": { … },
+    "warning": null
+  }
+```
+
+The server downloads the file, extracts the ComfyUI workflow from the embedded
+metadata, creates the asset, and returns the gallery link. The node surfaces
+`url` as its `gallery_url` output (falling back to `<app_base>/app/assets/<assetH>`
+if `url` is absent).
+
+### Embedded metadata the server reads
+
+The node's job is to make sure the lineage is *inside the file* before upload:
+
+- **PNG** — `prompt` and `workflow` `tEXt` chunks, written exactly as core
+  `SaveImage` writes them.
+- **Video** — container metadata tags written by ComfyUI's own `VIDEO.save_to()`,
+  with `workflow` and `prompt` as **top-level** keys (mirroring core `SaveVideo`:
+  `metadata.update(extra_pnginfo)` then `metadata["prompt"] = prompt`). Nesting
+  them would break server-side extraction.
+
+### Status codes the node handles
+
+| Code | Meaning | Node behaviour |
+| --- | --- | --- |
+| 200 | Asset created | Surface `gallery_url` |
+| 401 / 403 | Key invalid, revoked, or lacking scope | "check your API key" message |
+| 413 | Tenant storage limit reached | "storage full" message |
+| 429 | Rate limited | "wait and re-run" message |
+| other 4xx/5xx, network error | Failure at a named phase | Readable error naming the phase + code |
+
+---
+
+## 2. Lineage save — the sidebar's "Save to Numonic" button
+
+A lineage-only fallback: records the recovered workflow **without uploading the
+image**.
+
+```
+POST <save_url>                          # default: https://api.numonic.ai/v1/comfy-lineage/save
+Authorization: Bearer <user-supplied token>
+Content-Type: application/json
+  { "source": "comfyui", "source_filename": "…", "lineage": { <LineageResult> } }
+```
+
+- Authenticated with a **user-supplied** token, pasted in the browser and stored
+  there — never bundled with the package.
+- Sends the recovered lineage only — **never the raw image bytes**.
+- 401/403 → the node clears the stored token and shows the connect prompt.
+
+---
+
+## 3. Local recovery — no network
+
+`lineage.normalize_embedded_metadata` (Python) and `normalizeLocal` (browser) parse
+the PNG `workflow` / `prompt` chunks entirely on-device and produce the shared
+`LineageResult` shape:
 
 ```jsonc
 {
   "source": "comfyui",
   "recovered": true,
+  "mode": "local",
   "workflow_graph": { /* raw UI graph, or null */ },
-  "prompts": { "positive": "…", "negative": "…", "raw": { /* optional */ } },
+  "prompts": { "positive": "…", "negative": "…" },
   "models": ["…"],
   "loras": ["…"],
   "custom_nodes": ["…"],
@@ -35,34 +126,8 @@ hosted service offers it; the MVP node sends multipart only.
 }
 ```
 
-The node normalizes any response into this shape via `lineage.coerce_contract`,
-filling missing keys with safe defaults, and stamps `mode: "enhanced"`.
+Both implementations produce the same shape, so the UI is identical regardless of
+which one produced the result.
 
-## Status codes the node handles
-
-| Code | Meaning | Node behaviour |
-| --- | --- | --- |
-| 200 | Recovered (or `recovered:false` with warnings) | Render result |
-| 415 | Unsupported media type | Friendly message; fall back to local |
-| 422 | No recoverable metadata | Friendly message; fall back to local |
-| 5xx / network error | Service down/unreachable | Fall back to local recovery |
-
-## Local path parity
-
-The **local** recovery path (`lineage.normalize_embedded_metadata`, and the
-in-browser `normalizeLocal`) produces the **same shape** with `mode: "local"`,
-parsed entirely on-device from the PNG `workflow` / `prompt` chunks. This is why
-the UI is identical regardless of which path produced the result.
-
-## Save contract (separate surface — not inspect)
-
-```
-POST <save_url>                          # default: https://api.numonic.ai/v1/comfy-lineage/save
-Authorization: Bearer <user-supplied token>
-Content-Type: application/json
-  { "source": "comfyui", "source_filename": "…", "lineage": { <LineageResult> } }
-```
-
-- Authenticated with a **user-supplied** token (never bundled).
-- Sends the recovered lineage only — **never the raw image bytes**.
-- 401/403 → the node clears the stored token and shows the connect prompt.
+> **Removed in v0.3.0:** the opt-in hosted "enhanced recovery" (image-inspect)
+> surface and its `mode: "enhanced"` responses. Recovery is now local-only.
