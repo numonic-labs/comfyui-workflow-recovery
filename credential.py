@@ -50,6 +50,38 @@ class MissingCredentialError(Exception):
     """
 
 
+# The config file holds a credential in plain text (as `~/.aws/credentials`,
+# `~/.npmrc` and most developer tooling do): its protection is your OS user
+# account. On a machine you share with other people, restrict it — see the
+# README, "About this file". Warn at most once per process so a graph that saves
+# many images does not spam the console.
+_permission_warned = False
+
+
+def _warn_if_readable_by_others(path: str) -> None:
+    """Warn when the config file is group/world-readable.
+
+    POSIX only, deliberately: Windows secures files with NTFS ACLs, and
+    ``os.stat()`` there reports synthetic mode bits that do not reflect them —
+    checking those bits would print a false warning on every Windows machine.
+    Windows guidance (``icacls``) lives in the README instead.
+    """
+    global _permission_warned
+    if _permission_warned or os.name != "posix":
+        return
+    try:
+        mode = os.stat(path).st_mode
+    except OSError:  # pragma: no cover - defensive
+        return
+    if mode & 0o077:
+        _permission_warned = True
+        print(
+            "[Numonic] Warning: %s is readable by other users on this machine. "
+            "It contains your API key in plain text. Restrict it with: "
+            "chmod 600 %s" % (path, path)
+        )
+
+
 def _read_config_file() -> dict:
     """Return the parsed ``~/.numonic/config.json`` or an empty dict."""
     path = os.path.expanduser(_CONFIG_PATH)
@@ -58,6 +90,7 @@ def _read_config_file() -> dict:
             data = json.load(handle)
     except (OSError, json.JSONDecodeError):
         return {}
+    _warn_if_readable_by_others(path)
     return data if isinstance(data, dict) else {}
 
 

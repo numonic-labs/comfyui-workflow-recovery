@@ -66,7 +66,14 @@ the key to anyone you share them with.
 ### 2.1 Get a key
 
 In Numonic: **Settings → API Keys → New key**, using the **"ComfyUI node key"**
-preset (or any key with `write` or `comfy-ingest` scope). Copy the `napi_…` value.
+preset. Copy the `napi_…` value.
+
+**Prefer the least-privilege scope.** The preset mints a **`comfy-ingest`** key,
+which can add assets to your library and nothing else — if it ever leaked, the
+blast radius is limited to that. A general `write` key also works, but it can do
+considerably more, so only use one if you have a reason to. Keys are revocable at
+any time from the same screen; revoke and re-issue rather than reusing a key you
+are unsure about.
 
 ### 2.2 Give the key to ComfyUI — pick ONE of these
 
@@ -95,19 +102,46 @@ directory, containing:
 <details>
 <summary>Create it from a terminal (copy-paste)</summary>
 
-**Windows (PowerShell):**
+**Windows (PowerShell)** — the second command restricts the file to your account
+(the Windows equivalent of `chmod 600`; your user profile is already
+ACL-protected, so this mainly matters on a shared or managed machine):
 ```powershell
 mkdir "$env:USERPROFILE\.numonic" -Force
 '{ "api_key": "napi_..." }' | Out-File -Encoding utf8 "$env:USERPROFILE\.numonic\config.json"
+icacls "$env:USERPROFILE\.numonic\config.json" /inheritance:r /grant:r "$($env:USERNAME):(R,W)"
 ```
 
-**macOS / Linux:**
+**macOS / Linux** — files are created group/world-readable by default, so the
+`chmod` is worth doing, not optional:
 ```bash
 mkdir -p ~/.numonic
 printf '{ "api_key": "napi_..." }\n' > ~/.numonic/config.json
-chmod 600 ~/.numonic/config.json    # optional: make it readable only by you
+chmod 600 ~/.numonic/config.json
 ```
 </details>
+
+#### About this file (please read once)
+
+The key is stored in **plain text**, exactly as `~/.aws/credentials`, `~/.npmrc`,
+`~/.docker/config.json` and most developer tooling store theirs. What protects it
+is your **operating-system user account**, so:
+
+- **Restrict the file** if anyone else uses, administers, or can log into this
+  machine (the commands above). On macOS/Linux the node prints a warning at save
+  time if the file is readable by other users.
+- **It is never written into your workflows or your output files.** That is the
+  whole reason the key is not a node widget — you can share a workflow `.json` or
+  a generated PNG without leaking it.
+- **Watch out for folder sync.** If your home directory is synced to a cloud
+  drive or lives in a dotfiles repo, the key goes with it. Put it somewhere
+  unsynced, or use the environment-variable option instead.
+- **Revoke it** in Numonic → Settings → API Keys if the machine is shared,
+  retired, or you suspect exposure. Using the least-privilege `comfy-ingest`
+  scope (§2.1) keeps the impact small if that ever happens.
+
+The environment-variable option below is *not* more secure — an `export` in
+`~/.bashrc` is also a plaintext file, and Windows `setx` writes plain text to the
+registry. Pick whichever fits how you launch ComfyUI.
 
 #### Option B — environment variable
 
@@ -230,6 +264,7 @@ Reads ComfyUI's `workflow` / `prompt` PNG metadata, including compressed (`zTXt`
 | `Numonic is rate-limiting uploads (HTTP 429)` | Too many uploads too fast | Wait a moment and re-run |
 | `…has no native save_to() primitive` / video node won't connect | ComfyUI predates the native `VIDEO` type | Update ComfyUI, or use *Save Image to Numonic* |
 | `Numonic is unreachable` | Network/DNS/proxy problem, or a wrong host override | Check connectivity; unset `NUMONIC_API_URL` unless you deliberately set it |
+| `Warning: …config.json is readable by other users` | The config file's permissions let other accounts on this machine read your key (macOS/Linux only — Windows uses ACLs) | `chmod 600 ~/.numonic/config.json`. Harmless on a single-user machine, but worth fixing |
 
 The nodes never fail silently: every problem surfaces as a readable error in the
 ComfyUI UI and log.

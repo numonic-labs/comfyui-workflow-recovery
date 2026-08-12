@@ -1,8 +1,11 @@
+import contextlib
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(__file__))
 import _bootstrap  # noqa: F401
@@ -35,8 +38,14 @@ class CredentialTests(unittest.TestCase):
     def _write_config(self, payload):
         cfg_dir = os.path.join(self._home, ".numonic")
         os.makedirs(cfg_dir, exist_ok=True)
-        with open(os.path.join(cfg_dir, "config.json"), "w", encoding="utf-8") as fh:
+        path = os.path.join(cfg_dir, "config.json")
+        with open(path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh)
+        # Default creation mode is 0644, which trips the permission warning.
+        # Write it private by default so only the tests that target the warning
+        # loosen it; keeps unrelated tests silent.
+        if os.name == "posix":
+            os.chmod(path, 0o600)
 
     def test_key_from_env_wins(self):
         os.environ[credential.API_KEY_ENV] = "napi_env"
@@ -73,6 +82,56 @@ class CredentialTests(unittest.TestCase):
         self.assertEqual(credential.api_base_url(), "http://localhost:3000")
         os.environ[credential.ENV_API_URL] = "http://api.local:9000"
         self.assertEqual(credential.api_base_url(), "http://api.local:9000")
+
+    def _capture_load(self):
+        """Read the key, returning whatever was printed to stdout."""
+        credential._permission_warned = False  # reset the once-per-process guard
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            credential.load_api_key()
+        return buffer.getvalue()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX file modes only")
+    def test_warns_when_config_is_readable_by_others(self):
+        self._write_config({"api_key": "napi_file"})
+        path = os.path.join(self._home, ".numonic", "config.json")
+        os.chmod(path, 0o644)
+        output = self._capture_load()
+        self.assertIn("readable by other users", output)
+        self.assertIn("chmod 600", output)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX file modes only")
+    def test_no_warning_when_config_is_private(self):
+        self._write_config({"api_key": "napi_file"})
+        path = os.path.join(self._home, ".numonic", "config.json")
+        os.chmod(path, 0o600)
+        self.assertEqual(self._capture_load(), "")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX file modes only")
+    def test_warning_is_emitted_only_once_per_process(self):
+        self._write_config({"api_key": "napi_file"})
+        os.chmod(os.path.join(self._home, ".numonic", "config.json"), 0o644)
+        first = self._capture_load()
+        # Second read must stay silent (the guard is not reset here).
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            credential.load_api_key()
+        self.assertIn("readable by other users", first)
+        self.assertEqual(buffer.getvalue(), "")
+
+    def test_warning_never_fires_on_non_posix(self):
+        # Windows secures files with ACLs; os.stat mode bits there would
+        # false-positive, so the check must be skipped entirely.
+        self._write_config({"api_key": "napi_file"})
+        path = os.path.join(self._home, ".numonic", "config.json")
+        if os.name == "posix":
+            os.chmod(path, 0o644)
+        credential._permission_warned = False
+        buffer = io.StringIO()
+        with mock.patch.object(credential.os, "name", "nt"):
+            with contextlib.redirect_stdout(buffer):
+                credential.load_api_key()
+        self.assertEqual(buffer.getvalue(), "")
 
     def test_gallery_url_shape(self):
         os.environ[credential.ENV_APP_URL] = "https://numonic.ai"
