@@ -43,7 +43,7 @@ git clone https://github.com/numonic-labs/comfyui-workflow-recovery
 modules ComfyUI already ships. After restarting, ComfyUI's log lists the pack under
 *"Import times for custom nodes"* with no error.
 
-You now have three nodes (under the **Numonic** category) and a sidebar tab:
+You now have three nodes, under the **Numonic** category:
 
 | Node | Takes | Does |
 | --- | --- | --- |
@@ -291,16 +291,13 @@ workflow lineage (prompts, models, LoRAs, seed, sampler) already extracted.
 
 ## 4. Recover a workflow from an image
 
-Two ways, both entirely local — nothing leaves your machine:
+Add the **`Extract Workflow Lineage`** node and point it at an image in your input
+folder. It outputs the positive/negative prompts, models, LoRAs, custom nodes and
+the raw workflow JSON as strings you can use elsewhere in a graph.
 
-- **Sidebar tab** — open the *Workflow Recovery* tab and drop in any generated
-  image to read its lineage instantly.
-- **`Extract Workflow Lineage` node** — point it at an image in your input folder;
-  it outputs positive/negative prompts, models, LoRAs, custom nodes and the raw
-  workflow JSON as strings you can use elsewhere in a graph.
-
-Reads ComfyUI's `workflow` / `prompt` PNG metadata, including compressed (`zTXt` /
-`iTXt`) chunks that some tools miss.
+Entirely local — nothing leaves your machine. Reads ComfyUI's `workflow` / `prompt`
+PNG metadata, including the compressed (`zTXt` / `iTXt`) chunks that some tools
+miss.
 
 ---
 
@@ -327,7 +324,7 @@ Your prompts are yours. Recovery never phones home:
 
 | Path | Network? | When |
 | --- | --- | --- |
-| **Local recovery** (sidebar + `Extract Workflow Lineage`) | ❌ None | Always. Parsed on your machine / in your browser. Nothing is sent anywhere. |
+| **Local recovery** (`Extract Workflow Lineage`) | ❌ None | Always. Parsed on your machine. Nothing is sent anywhere. |
 | **Save Image / Video to Numonic** (graph nodes) | ✅ To Numonic | Only if you add the node **and** configure a key. Uploads the asset to **your own** Numonic tenant. |
 
 - This package contains **no secret, token, or key of its own.** The save nodes use

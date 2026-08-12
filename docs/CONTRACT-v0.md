@@ -109,7 +109,8 @@ Content-Type: application/json
 
 ## 3. Local recovery — no network
 
-`lineage.normalize_embedded_metadata` (Python) and `normalizeLocal` (browser) parse
+`lineage.normalize_embedded_metadata` (Python), and its `normalizeLocal` twin in the
+dormant browser panel (see the note in section 2), parse
 the PNG `workflow` / `prompt` chunks entirely on-device and produce the shared
 `LineageResult` shape:
 
