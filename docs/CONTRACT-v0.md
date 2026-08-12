@@ -85,22 +85,25 @@ The node's job is to make sure the lineage is *inside the file* before upload:
 
 ---
 
-## 2. Lineage save — the sidebar's "Save to Numonic" button
+## 2. Lineage save — DORMANT, no live endpoint
 
-A lineage-only fallback: records the recovered workflow **without uploading the
-image**.
+> **Status: not available.** The sidebar's "Save to Numonic" button and its
+> `save_client.py` / `POST /numonic/workflow-recovery/save` plumbing are still in
+> the tree, but the hosted endpoint they target was never deployed — the default
+> host `api.numonic.ai` does not resolve. Clicking the button therefore always
+> fails with "Numonic is unreachable". It is **not** documented as a user-facing
+> feature in the README, and it is slated for removal. Use the asset-save nodes
+> (§1) instead; they supersede this path entirely, since they capture the lineage
+> *and* the asset.
+
+The shape it was built against, for whoever removes or revives it:
 
 ```
-POST <save_url>                          # default: https://api.numonic.ai/v1/comfy-lineage/save
+POST <save_url>                          # default (dead): https://api.numonic.ai/v1/comfy-lineage/save
 Authorization: Bearer <user-supplied token>
 Content-Type: application/json
   { "source": "comfyui", "source_filename": "…", "lineage": { <LineageResult> } }
 ```
-
-- Authenticated with a **user-supplied** token, pasted in the browser and stored
-  there — never bundled with the package.
-- Sends the recovered lineage only — **never the raw image bytes**.
-- 401/403 → the node clears the stored token and shows the connect prompt.
 
 ---
 

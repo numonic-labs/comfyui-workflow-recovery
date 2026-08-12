@@ -329,12 +329,10 @@ Your prompts are yours. Recovery never phones home:
 | --- | --- | --- |
 | **Local recovery** (sidebar + `Extract Workflow Lineage`) | ❌ None | Always. Parsed on your machine / in your browser. Nothing is sent anywhere. |
 | **Save Image / Video to Numonic** (graph nodes) | ✅ To Numonic | Only if you add the node **and** configure a key. Uploads the asset to **your own** Numonic tenant. |
-| **Save lineage** (sidebar button) | ✅ To Numonic | Only if you click Save and connect an account. Sends the recovered lineage — never the raw image. |
 
 - This package contains **no secret, token, or key of its own.** The save nodes use
-  the key *you* place on your machine; the sidebar save uses a token *you* paste,
-  stored only in your browser. Neither is ever written into a workflow or an output
-  file.
+  the key *you* place on your machine, and it is never written into a workflow or an
+  output file.
 - With no key configured, everything stays 100% local.
 
 ---
@@ -350,8 +348,6 @@ default.
 | `NUMONIC_APP_URL` | Numonic app host, used for the returned gallery link | `https://www.numonic.ai` |
 | `NUMONIC_API_URL` | Numonic REST API host — only change this to target a self-hosted or staging instance | same as `NUMONIC_APP_URL` |
 | `WORKFLOW_RECOVERY_HTTP_TIMEOUT` | Network timeout, seconds | `20` |
-| `WORKFLOW_RECOVERY_SAVE_URL` | Endpoint for the sidebar's lineage-save button | Numonic public API |
-| `WORKFLOW_RECOVERY_CONNECT_URL` | Account-connect page opened by the sidebar | Numonic app |
 
 The config file accepts the same host overrides as keys: `api_key`, `app_url`,
 `api_url`.
