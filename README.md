@@ -3,7 +3,8 @@
 **Save your ComfyUI generations straight into [Numonic](https://numonic.ai) — and
 recover the workflow behind any ComfyUI image.**
 
-A free, open-source ComfyUI custom node pack from [Numonic](https://numonic.ai).
+A free, open-source ComfyUI custom node pack from [Numonic](https://numonic.ai),
+a digital asset manager for AI-generated work.
 
 - **Save to Numonic** — drop-in replacements for the stock *Save Image* / *Save
   Video*. When your graph runs, the generated asset itself (real bytes, with its
@@ -65,8 +66,15 @@ would leak the key to anyone you share them with.
 
 ### Step 1 — get your key
 
-In Numonic: **Settings → API Keys → New key**, using the **"ComfyUI node key"**
-preset. Copy the `napi_…` value.
+**New to Numonic?** It is a digital asset manager built for AI-generated work:
+your generations are stored together with their lineage — prompt, model, seed,
+workflow — so they stay findable instead of piling up as `ComfyUI_00042_.png`.
+Create an account at **[numonic.ai](https://numonic.ai)**, then come back here.
+(You only need an account for *saving*; recovering a workflow from an image works
+offline with no account — see [section 4](#4-recover-a-workflow-from-an-image).)
+
+In Numonic, open **[Settings → API Keys](https://numonic.ai/app/settings)** →
+**New key**, using the **"ComfyUI node key"** preset. Copy the `napi_…` value.
 
 That preset mints a **`comfy-ingest`** key, which can add assets to your library
 and nothing else — so if it ever leaked, that is the whole blast radius. A general
