@@ -86,7 +86,12 @@ def _read_config_file() -> dict:
     """Return the parsed ``~/.numonic/config.json`` or an empty dict."""
     path = os.path.expanduser(_CONFIG_PATH)
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        # utf-8-sig, not utf-8: Windows tools routinely write a UTF-8 BOM
+        # (PowerShell 5.1's `Out-File -Encoding utf8`, and Notepad depending on
+        # version/settings). Plain utf-8 leaves the BOM in the string, json
+        # rejects it, and the key silently looks missing. utf-8-sig strips a BOM
+        # when present and is identical to utf-8 when it is not.
+        with open(path, "r", encoding="utf-8-sig") as handle:
             data = json.load(handle)
     except (OSError, json.JSONDecodeError):
         return {}

@@ -28,10 +28,11 @@ container. Run it in an environment that has:
                                       defaults to https://numonic.ai
         NUMONIC_APP_URL   (optional)  app base for the gallery link fallback
 
-Usage:
+Usage (prompting for the key keeps it out of your shell history):
 
-    NUMONIC_API_KEY=napi_... NUMONIC_API_URL=http://localhost:3000 \
-        python3 docs/dev-smoke-test.py
+    read -rs -p 'API key: ' NUMONIC_API_KEY && echo && export NUMONIC_API_KEY
+    export NUMONIC_API_URL=http://localhost:3000
+    python3 docs/dev-smoke-test.py
 
 Exit code 0 = the asset was created and ComfyUI lineage was extracted.
 Non-zero  = something in the chain failed (message explains which phase).

@@ -56,6 +56,19 @@ class CredentialTests(unittest.TestCase):
         self._write_config({"api_key": "napi_file"})
         self.assertEqual(credential.load_api_key(), "napi_file")
 
+    def test_key_from_config_file_written_with_a_utf8_bom(self):
+        # PowerShell 5.1 (`Out-File -Encoding utf8`) and some Notepad versions
+        # prepend a UTF-8 BOM. Reading such a file as plain utf-8 makes json
+        # raise, which would look to the user like "no key configured".
+        cfg_dir = os.path.join(self._home, ".numonic")
+        os.makedirs(cfg_dir, exist_ok=True)
+        path = os.path.join(cfg_dir, "config.json")
+        with open(path, "wb") as fh:
+            fh.write('{ "api_key": "napi_bom" }'.encode("utf-8-sig"))
+        if os.name == "posix":
+            os.chmod(path, 0o600)
+        self.assertEqual(credential.load_api_key(), "napi_bom")
+
     def test_missing_key_returns_none(self):
         self.assertIsNone(credential.load_api_key())
 

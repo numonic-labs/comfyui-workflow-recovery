@@ -91,15 +91,25 @@ inside your home directory:
 This works no matter how you start ComfyUI, and **takes effect immediately — no
 restart needed**. Pick whichever way of creating it you are comfortable with.
 
+> The terminal blocks below **prompt** you for the key instead of taking it as
+> part of the command. That is deliberate: anything you type as a command is
+> recorded in your shell history (`~/.bash_history`, PowerShell's
+> `ConsoleHost_history.txt`), where a secret does not belong.
+
 #### Windows — with PowerShell (fastest)
 
-Paste all three lines into PowerShell, replacing `napi_...` with your key. The
-third line restricts the file to your account:
+Paste the whole block into PowerShell. It **prompts** for your key rather than
+taking it on the command line, so the key never appears on screen or in your
+PowerShell history. The last line restricts the file to your account:
 
 ```powershell
-mkdir "$env:USERPROFILE\.numonic" -Force
-'{ "api_key": "napi_..." }' | Out-File -Encoding utf8 "$env:USERPROFILE\.numonic\config.json"
-icacls "$env:USERPROFILE\.numonic\config.json" /inheritance:r /grant:r "$($env:USERNAME):(R,W)"
+$dir = "$env:USERPROFILE\.numonic"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+$sec = Read-Host "Paste your Numonic API key" -AsSecureString
+$key = (New-Object System.Net.NetworkCredential('', $sec)).Password
+[IO.File]::WriteAllText("$dir\config.json", "{ ""api_key"": ""$key"" }")
+Remove-Variable key, sec
+icacls "$dir\config.json" /inheritance:r /grant:r "$($env:USERNAME):(R,W)" | Out-Null
 ```
 
 #### Windows — by hand, no terminal
@@ -120,9 +130,14 @@ icacls "$env:USERPROFILE\.numonic\config.json" /inheritance:r /grant:r "$($env:U
 
 #### macOS / Linux — Terminal
 
+Paste the whole block. `read -rs` **prompts** for the key without echoing it, so
+it never appears on screen or in your shell history:
+
 ```bash
 mkdir -p ~/.numonic
-printf '{ "api_key": "napi_..." }\n' > ~/.numonic/config.json
+read -rs -p 'Paste your Numonic API key: ' KEY && echo
+printf '{ "api_key": "%s" }\n' "$KEY" > ~/.numonic/config.json
+unset KEY
 chmod 600 ~/.numonic/config.json
 ```
 
@@ -152,30 +167,43 @@ line *above* the line starting with `python`:
 set NUMONIC_API_KEY=napi_...
 ```
 
-**Windows — persistent, any launcher:** run once, then sign out and back in
-(`setx` does not affect programs that are already running):
+(Your key then lives in plain text inside `run_nvidia_gpu.bat`, so don't share or
+screenshot that file.)
 
-```bat
-setx NUMONIC_API_KEY "napi_..."
+**Windows — persistent, any launcher:** run in PowerShell, then sign out and back
+in (`setx` does not affect programs that are already running). It prompts for the
+key so it stays out of your history:
+
+```powershell
+$sec = Read-Host "Paste your Numonic API key" -AsSecureString
+$key = (New-Object System.Net.NetworkCredential('', $sec)).Password
+setx NUMONIC_API_KEY $key
+Remove-Variable key, sec
 ```
 
-**macOS / Linux:** export it, then start ComfyUI *from that same terminal*. Add the
-line to `~/.bashrc` / `~/.zshrc` to make it permanent.
+**macOS / Linux:** read it into the variable, then start ComfyUI *from that same
+terminal*:
 
 ```bash
-export NUMONIC_API_KEY="napi_..."
+read -rs -p 'Paste your Numonic API key: ' NUMONIC_API_KEY && echo
+export NUMONIC_API_KEY
 python main.py
 ```
+
+To make it permanent you would put the key in `~/.bashrc` / `~/.zshrc` — but that
+is a plaintext file that often ends up in a dotfiles repo, so the config file
+above is usually the better choice.
 
 **Linux — ComfyUI as a `systemd` service:** a shell `export` will not reach a
 service; give it the variable explicitly.
 
 ```bash
+read -rs -p 'Paste your Numonic API key: ' KEY && echo
 sudo mkdir -p /etc/systemd/system/comfyui.service.d
-sudo tee /etc/systemd/system/comfyui.service.d/numonic.conf >/dev/null <<'CONF'
-[Service]
-Environment=NUMONIC_API_KEY=napi_...
-CONF
+printf '[Service]\nEnvironment=NUMONIC_API_KEY=%s\n' "$KEY" \
+  | sudo tee /etc/systemd/system/comfyui.service.d/numonic.conf >/dev/null
+unset KEY
+sudo chmod 600 /etc/systemd/system/comfyui.service.d/numonic.conf
 sudo systemctl daemon-reload
 sudo systemctl restart comfyui.service
 ```
