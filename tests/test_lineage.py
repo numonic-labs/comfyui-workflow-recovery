@@ -65,6 +65,74 @@ class LocalNormalizationTests(unittest.TestCase):
         self.assertTrue(result["recovered"])
 
 
+class FluxNoiseSeedTests(unittest.TestCase):
+    """Regression: recover the seed from ``RandomNoise.noise_seed`` (Flux /
+    custom-sampling), not only ``KSampler.seed``. Guards the gap confirmed on a
+    real Flux 2 dev image (seed 1027111520328378 was dropped before the fix)."""
+
+    def test_seed_recovered_from_noise_seed(self):
+        result = lineage.normalize_embedded_metadata(None, json.dumps(fixtures.flux_prompt()))
+        self.assertTrue(result["recovered"])
+        self.assertEqual(result["seed"], 1027111520328378)
+        self.assertEqual(result["sampler"], "euler")
+        self.assertEqual(result["models"], ["flux2_dev_fp8mixed.safetensors"])
+        self.assertEqual(result["loras"], ["Flux_2-Turbo-LoRA_comfyui.safetensors"])
+
+    def test_classic_seed_preferred_over_noise_seed_within_a_node(self):
+        prompt = {"1": {"class_type": "KSampler", "inputs": {"seed": 5, "noise_seed": 9}}}
+        result = lineage.normalize_embedded_metadata(None, json.dumps(prompt))
+        self.assertEqual(result["seed"], 5)
+
+    def test_linked_noise_seed_is_ignored_not_crashing(self):
+        # A noise_seed wired from another node is a link list, not an int; it must
+        # be skipped (link resolution is a separate, larger enhancement), no crash.
+        prompt = {"1": {"class_type": "RandomNoise", "inputs": {"noise_seed": ["9", 0]}}}
+        result = lineage.normalize_embedded_metadata(None, json.dumps(prompt))
+        self.assertIsNone(result["seed"])
+
+
+class CoreNodeClassificationTests(unittest.TestCase):
+    """Custom-node detection must trust the graph's own ``cnr_id`` stamps.
+
+    The static fallback list predates the Flux / custom-sampling era, so without
+    this every built-in in a modern template (RandomNoise, KSamplerSelect,
+    SamplerCustomAdvanced, FluxGuidance...) was reported as a *custom* node.
+    """
+
+    def test_workflow_cnr_id_suppresses_core_nodes(self):
+        result = lineage.normalize_embedded_metadata(
+            json.dumps(fixtures.flux_workflow()), json.dumps(fixtures.flux_prompt())
+        )
+        # Only the genuine third-party node survives.
+        self.assertEqual(result["custom_nodes"], ["DetailDaemonSamplerNode"])
+
+    def test_without_workflow_falls_back_to_static_list(self):
+        # No UI graph => no cnr_id evidence => conservative static list only, so
+        # the modern core nodes are (still) reported. Documents the fallback.
+        result = lineage.normalize_embedded_metadata(
+            None, json.dumps(fixtures.flux_prompt())
+        )
+        for node_type in ("RandomNoise", "KSamplerSelect", "DetailDaemonSamplerNode"):
+            self.assertIn(node_type, result["custom_nodes"])
+
+    def test_core_types_walks_subgraph_definitions(self):
+        core = lineage.core_types_from_workflow(fixtures.flux_workflow())
+        # Top-level and subgraph-nested built-ins alike.
+        self.assertIn("UNETLoader", core)
+        self.assertIn("RandomNoise", core)
+        self.assertIn("SamplerCustomAdvanced", core)
+        # A third-party cnr_id is never treated as core.
+        self.assertNotIn("DetailDaemonSamplerNode", core)
+
+    def test_graph_without_cnr_id_yields_empty_set(self):
+        legacy = {"nodes": [{"id": 1, "type": "KSampler", "properties": {}}]}
+        self.assertEqual(lineage.core_types_from_workflow(legacy), set())
+
+    def test_malformed_workflow_is_safe(self):
+        for bad in (None, "nonsense", 42, {"nodes": "not-a-list"}, {"definitions": 5}):
+            self.assertEqual(lineage.core_types_from_workflow(bad), set())
+
+
 class CoerceContractTests(unittest.TestCase):
     def test_fills_missing_keys(self):
         result = lineage.coerce_contract({"recovered": True}, mode="enhanced")

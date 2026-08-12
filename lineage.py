@@ -31,10 +31,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 SOURCE_COMFYUI = "comfyui"
 
-# Node ``class_type`` values that ship with core ComfyUI. Anything outside this
-# set that appears in a recovered graph is reported as a (best-effort) custom
-# node — the exact list is intentionally conservative; the hosted enhanced path
-# resolves custom nodes authoritatively.
+# ``properties.cnr_id`` value ComfyUI stamps on its own built-in nodes.
+CORE_PACK_ID = "comfy-core"
+
+# Fallback list of ``class_type`` values that ship with core ComfyUI, used only
+# when the image carries no UI workflow graph (or an old one without
+# ``cnr_id``). When the graph IS present, ``core_types_from_workflow`` derives
+# the real set from the image itself — see that function for why.
 _CORE_NODE_TYPES = frozenset(
     {
         "KSampler",
@@ -78,6 +81,11 @@ _CORE_NODE_TYPES = frozenset(
 # checkpoint / model file name.
 _MODEL_INPUT_KEYS = ("ckpt_name", "unet_name", "model_name", "model")
 _LORA_INPUT_KEYS = ("lora_name",)
+# The seed lives on ``seed`` for classic samplers (``KSampler``), but on
+# ``noise_seed`` for the modern Flux / custom-sampling pattern where a
+# ``RandomNoise`` node feeds ``SamplerCustomAdvanced``. Read both so seeds are
+# recovered on Flux workflows, not just classic ones.
+_SEED_INPUT_KEYS = ("seed", "noise_seed")
 _POSITIVE_HINTS = ("positive", "pos")
 _NEGATIVE_HINTS = ("negative", "neg")
 
@@ -141,11 +149,59 @@ def _iter_prompt_nodes(prompt_obj: Any) -> List[Tuple[str, Dict[str, Any]]]:
     return nodes
 
 
-def _extract_from_prompt(prompt_obj: Any, result: Dict[str, Any]) -> None:
-    """Populate models/loras/custom_nodes/seed/sampler/prompts from API prompt."""
+def _iter_workflow_nodes(workflow_obj: Any):
+    """Yield every node dict in a UI workflow graph, including inside subgraphs."""
+    if not isinstance(workflow_obj, dict):
+        return
+    for node in workflow_obj.get("nodes") or []:
+        if isinstance(node, dict):
+            yield node
+    definitions = workflow_obj.get("definitions")
+    if isinstance(definitions, dict):
+        for subgraph in definitions.get("subgraphs") or []:
+            if isinstance(subgraph, dict):
+                for node in subgraph.get("nodes") or []:
+                    if isinstance(node, dict):
+                        yield node
+
+
+def core_types_from_workflow(workflow_obj: Any) -> set:
+    """Node ``type`` names the workflow itself attributes to core ComfyUI.
+
+    ComfyUI stamps every node in the UI graph with ``properties.cnr_id`` — the
+    registry id of the pack it came from, or ``"comfy-core"`` for a built-in.
+    Trusting that beats guessing from a hand-maintained list, which goes stale
+    every time ComfyUI ships new core nodes (the entire Flux / custom-sampling
+    family post-dates the fallback list). Returns an empty set for graphs that
+    predate ``cnr_id``, so callers fall back to the static list alone.
+
+    Matching is by node ``type``, not node id: the API prompt namespaces ids
+    inside subgraphs (``"98:25"``) while the UI graph does not, and types are
+    stable across both.
+    """
+    core = set()
+    for node in _iter_workflow_nodes(workflow_obj):
+        node_type = node.get("type")
+        properties = node.get("properties")
+        if not isinstance(node_type, str) or not isinstance(properties, dict):
+            continue
+        if properties.get("cnr_id") == CORE_PACK_ID:
+            core.add(node_type)
+    return core
+
+
+def _extract_from_prompt(
+    prompt_obj: Any, result: Dict[str, Any], core_types: Any = None
+) -> None:
+    """Populate models/loras/custom_nodes/seed/sampler/prompts from API prompt.
+
+    ``core_types`` supplements the fallback list with the set the image's own
+    workflow graph declares as core (see ``core_types_from_workflow``).
+    """
     nodes = _iter_prompt_nodes(prompt_obj)
     if not nodes:
         return
+    known_core = _CORE_NODE_TYPES | set(core_types or ())
 
     models: List[str] = []
     loras: List[str] = []
@@ -156,7 +212,7 @@ def _extract_from_prompt(prompt_obj: Any, result: Dict[str, Any]) -> None:
 
     for _node_id, node in nodes:
         class_type = str(node.get("class_type", ""))
-        if class_type and class_type not in _CORE_NODE_TYPES:
+        if class_type and class_type not in known_core:
             custom_nodes.append(class_type)
 
         inputs = node.get("inputs")
@@ -173,9 +229,11 @@ def _extract_from_prompt(prompt_obj: Any, result: Dict[str, Any]) -> None:
                 loras.append(val)
 
         if result["seed"] is None:
-            seed = inputs.get("seed")
-            if isinstance(seed, (int, float)) and not isinstance(seed, bool):
-                result["seed"] = int(seed)
+            for key in _SEED_INPUT_KEYS:
+                seed = inputs.get(key)
+                if isinstance(seed, (int, float)) and not isinstance(seed, bool):
+                    result["seed"] = int(seed)
+                    break
         if result["sampler"] is None:
             sampler = inputs.get("sampler_name")
             if isinstance(sampler, str) and sampler:
@@ -241,7 +299,7 @@ def normalize_embedded_metadata(
     if workflow is not None:
         result["workflow_graph"] = workflow
     if prompt is not None:
-        _extract_from_prompt(prompt, result)
+        _extract_from_prompt(prompt, result, core_types_from_workflow(workflow))
 
     # A graph with no API-prompt chunk still counts as a partial recovery.
     result["recovered"] = bool(

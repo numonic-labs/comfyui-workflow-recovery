@@ -24,7 +24,7 @@ key with ``write`` OR ``comfy-ingest`` scope authenticates every call:
 Lineage is auto-extracted **server-side** from the embedded workflow, so this
 core does not touch metadata — the producer already embedded it in the bytes.
 
-Stdlib only (``urllib``), mirroring ``save_client.py``. Blocking; the graph
+Stdlib only (``urllib``). Blocking; the graph
 node calls it from ComfyUI's worker thread.
 """
 
