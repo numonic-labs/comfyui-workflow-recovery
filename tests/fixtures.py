@@ -122,12 +122,66 @@ def flux_prompt() -> dict:
             },
         },
         "26": {"class_type": "FluxGuidance", "inputs": {"guidance": 4.0}},
+        # A genuine third-party node, to prove real custom nodes still surface.
+        "77": {"class_type": "DetailDaemonSamplerNode", "inputs": {"sampler": ["16", 0]}},
+    }
+
+
+def _core_node(node_id: int, node_type: str) -> dict:
+    """A UI-graph node stamped as core ComfyUI, the way ComfyUI writes it."""
+    return {
+        "id": node_id,
+        "type": node_type,
+        "properties": {"cnr_id": "comfy-core", "Node name for S&R": node_type},
+    }
+
+
+def flux_workflow() -> dict:
+    """UI workflow graph pairing with :func:`flux_prompt`.
+
+    Mirrors a real Flux 2 template: the sampling nodes live inside a *subgraph*
+    definition, and every built-in carries ``properties.cnr_id == "comfy-core"``.
+    One third-party node carries a different ``cnr_id``.
+    """
+    return {
+        "id": "wf-1",
+        "version": 0.4,
+        "nodes": [_core_node(12, "UNETLoader"), _core_node(6, "CLIPTextEncode")],
+        "definitions": {
+            "subgraphs": [
+                {
+                    "id": "sg-1",
+                    "name": "Text to Image (Flux.2 Dev)",
+                    "nodes": [
+                        _core_node(25, "RandomNoise"),
+                        _core_node(16, "KSamplerSelect"),
+                        _core_node(13, "SamplerCustomAdvanced"),
+                        _core_node(26, "FluxGuidance"),
+                        {
+                            "id": 77,
+                            "type": "DetailDaemonSamplerNode",
+                            "properties": {"cnr_id": "detail-daemon"},
+                        },
+                    ],
+                }
+            ]
+        },
     }
 
 
 def flux_png() -> bytes:
     """A PNG carrying the Flux (noise_seed) prompt as uncompressed tEXt."""
     return make_png(text_chunks={"prompt": json.dumps(flux_prompt())})
+
+
+def flux_png_with_workflow() -> bytes:
+    """A Flux PNG carrying BOTH the API prompt and the UI workflow graph."""
+    return make_png(
+        text_chunks={
+            "prompt": json.dumps(flux_prompt()),
+            "workflow": json.dumps(flux_workflow()),
+        }
+    )
 
 
 def sample_workflow() -> dict:

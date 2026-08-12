@@ -91,6 +91,48 @@ class FluxNoiseSeedTests(unittest.TestCase):
         self.assertIsNone(result["seed"])
 
 
+class CoreNodeClassificationTests(unittest.TestCase):
+    """Custom-node detection must trust the graph's own ``cnr_id`` stamps.
+
+    The static fallback list predates the Flux / custom-sampling era, so without
+    this every built-in in a modern template (RandomNoise, KSamplerSelect,
+    SamplerCustomAdvanced, FluxGuidance...) was reported as a *custom* node.
+    """
+
+    def test_workflow_cnr_id_suppresses_core_nodes(self):
+        result = lineage.normalize_embedded_metadata(
+            json.dumps(fixtures.flux_workflow()), json.dumps(fixtures.flux_prompt())
+        )
+        # Only the genuine third-party node survives.
+        self.assertEqual(result["custom_nodes"], ["DetailDaemonSamplerNode"])
+
+    def test_without_workflow_falls_back_to_static_list(self):
+        # No UI graph => no cnr_id evidence => conservative static list only, so
+        # the modern core nodes are (still) reported. Documents the fallback.
+        result = lineage.normalize_embedded_metadata(
+            None, json.dumps(fixtures.flux_prompt())
+        )
+        for node_type in ("RandomNoise", "KSamplerSelect", "DetailDaemonSamplerNode"):
+            self.assertIn(node_type, result["custom_nodes"])
+
+    def test_core_types_walks_subgraph_definitions(self):
+        core = lineage.core_types_from_workflow(fixtures.flux_workflow())
+        # Top-level and subgraph-nested built-ins alike.
+        self.assertIn("UNETLoader", core)
+        self.assertIn("RandomNoise", core)
+        self.assertIn("SamplerCustomAdvanced", core)
+        # A third-party cnr_id is never treated as core.
+        self.assertNotIn("DetailDaemonSamplerNode", core)
+
+    def test_graph_without_cnr_id_yields_empty_set(self):
+        legacy = {"nodes": [{"id": 1, "type": "KSampler", "properties": {}}]}
+        self.assertEqual(lineage.core_types_from_workflow(legacy), set())
+
+    def test_malformed_workflow_is_safe(self):
+        for bad in (None, "nonsense", 42, {"nodes": "not-a-list"}, {"definitions": 5}):
+            self.assertEqual(lineage.core_types_from_workflow(bad), set())
+
+
 class CoerceContractTests(unittest.TestCase):
     def test_fills_missing_keys(self):
         result = lineage.coerce_contract({"recovered": True}, mode="enhanced")

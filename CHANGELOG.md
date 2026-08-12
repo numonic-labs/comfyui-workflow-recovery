@@ -39,6 +39,18 @@ immutable.
   unchanged. A `noise_seed` supplied via a *link* from another node still does
   not resolve (graph-link following remains out of scope).
 
+- **Core ComfyUI nodes are no longer mis-reported as custom nodes.** The
+  `custom_nodes` list was matched against a hand-maintained set of built-in
+  `class_type` names that predated the Flux / custom-sampling era, so on the
+  stock ComfyUI Flux 2 template *every* built-in — `RandomNoise`,
+  `KSamplerSelect`, `SamplerCustomAdvanced`, `FluxGuidance`, `Flux2Scheduler`,
+  `EmptyFlux2LatentImage`, the `Primitive*`/`ComfySwitchNode` helpers — was
+  listed as third-party (10 out of 10 false positives). Classification now
+  derives the built-in set from the image's own UI workflow graph, which stamps
+  each node with `properties.cnr_id` (`"comfy-core"` for built-ins), walking
+  subgraph definitions too. This cannot go stale as ComfyUI adds core nodes.
+  Images carrying no workflow chunk fall back to the previous static list.
+
 ### Removed
 
 - **Enhanced recovery** (hosted image-inspect) — `inspect_client.py`, the
