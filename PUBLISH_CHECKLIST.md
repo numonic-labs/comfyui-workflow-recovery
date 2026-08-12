@@ -9,7 +9,8 @@ touched GitHub, the Comfy Registry, or any secret.
 ### 1. Confirm the public product name
 
 Confirm the **public product name** is **"Numonic Workflow Recovery"** (used in
-`DisplayName`, README, sidebar). This is the one naming decision to sign off. It
+`DisplayName`, README, node titles). This is the one naming decision to sign
+off. It
 deliberately does **not** say "Provenance-Sign" — this is a read-only recovery
 tool, not a signing/provenance tool.
 
@@ -59,8 +60,8 @@ confirmed (Claim-My-Node) — no separate action needed.
   gallery-link shape (`${APP_URL}/app/assets/{assetH}`) matches what the web app
   returns; override the host via `NUMONIC_APP_URL` / `NUMONIC_API_URL` for
   staging.
-- The sidebar **lineage-save** funnel still posts to the private ingest route
-  (`WORKFLOW_RECOVERY_SAVE_URL`, contract v0 in `docs/CONTRACT-v0.md`).
+- The sidebar **lineage-save** funnel was removed in v0.3.0 (its endpoint was
+  never deployed) — see `docs/CONTRACT-v0.md` §2.
 - **Local recovery works today with no endpoint and no key** — the pack is
   useful and demoable before anything hosted lands; the save nodes simply report
   a clear "set NUMONIC_API_KEY" message until a key is configured.

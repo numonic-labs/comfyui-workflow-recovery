@@ -85,21 +85,19 @@ The node's job is to make sure the lineage is *inside the file* before upload:
 
 ---
 
-## 2. Lineage save — DORMANT, no live endpoint
+## 2. Lineage save — REMOVED in v0.3.0
 
-> **Status: not available.** The sidebar's "Save to Numonic" button and its
-> `save_client.py` / `POST /numonic/workflow-recovery/save` plumbing are still in
-> the tree, but the hosted endpoint they target was never deployed — the default
-> host `api.numonic.ai` does not resolve. Clicking the button therefore always
-> fails with "Numonic is unreachable". It is **not** documented as a user-facing
-> feature in the README, and it is slated for removal. Use the asset-save nodes
-> (§1) instead; they supersede this path entirely, since they capture the lineage
-> *and* the asset.
+> **Status: removed.** The browser sidebar panel, its "Save to Numonic" button,
+> `save_client.py`, and the `POST /numonic/workflow-recovery/save` +
+> `GET /numonic/workflow-recovery/status` routes were all deleted in v0.3.0. The
+> hosted endpoint they targeted was never deployed (`api.numonic.ai` did not
+> resolve), so the button could only ever fail. The asset-save nodes (§1)
+> supersede this path entirely — they capture the lineage *and* the asset.
 
-The shape it was built against, for whoever removes or revives it:
+The shape it was built against, for whoever might revive it:
 
 ```
-POST <save_url>                          # default (dead): https://api.numonic.ai/v1/comfy-lineage/save
+POST https://api.numonic.ai/v1/comfy-lineage/save   # never deployed
 Authorization: Bearer <user-supplied token>
 Content-Type: application/json
   { "source": "comfyui", "source_filename": "…", "lineage": { <LineageResult> } }
@@ -109,10 +107,9 @@ Content-Type: application/json
 
 ## 3. Local recovery — no network
 
-`lineage.normalize_embedded_metadata` (Python), and its `normalizeLocal` twin in the
-dormant browser panel (see the note in section 2), parse
-the PNG `workflow` / `prompt` chunks entirely on-device and produce the shared
-`LineageResult` shape:
+`lineage.normalize_embedded_metadata` (Python) parses the PNG `workflow` /
+`prompt` chunks entirely on-device and produces the shared `LineageResult`
+shape (the browser-side twin was removed with the sidebar in v0.3.0):
 
 ```jsonc
 {

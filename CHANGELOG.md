@@ -34,18 +34,29 @@ immutable.
   read the seed only from the classic `KSampler.seed` input, so workflows using
   `RandomNoise` → `SamplerCustomAdvanced` (the dominant Flux pattern, incl.
   Flux 2) reported `seed: null` even though the seed was embedded in the image.
-  Both parsers now also read `RandomNoise.noise_seed` — `lineage.py` (graph
-  node) and `web/workflow_recovery.js` (sidebar) — so they stay in parity.
-  Verified against a real Flux 2 dev generation. Classic `KSampler` recovery is
+  `lineage.py` now also reads `RandomNoise.noise_seed`. Verified against a real
+  Flux 2 dev generation. Classic `KSampler` recovery is
   unchanged. A `noise_seed` supplied via a *link* from another node still does
   not resolve (graph-link following remains out of scope).
 
 ### Removed
 
 - **Enhanced recovery** (hosted image-inspect) — `inspect_client.py`, the
-  `POST /recover` route, the `inspect_url` / `enhancedRecoveryAvailable` config,
-  and the sidebar checkbox. Local recovery and the sidebar lineage-save funnel
-  are unchanged.
+  `POST /recover` route, and the `inspect_url` / `enhancedRecoveryAvailable`
+  config. Local recovery is unchanged.
+- **The browser sidebar panel**, in full. `web/` (the frontend extension and its
+  CSS), `save_client.py`, `routes.py` (both the `GET /status` and
+  `POST /save` routes), and the `WEB_DIRECTORY` registration are all gone; the
+  pack now ships **graph nodes only** and registers no server route. Rationale:
+  the panel duplicated `Extract Workflow Lineage` — it was a second, untested
+  reimplementation of the parser in JavaScript that had to be kept in lockstep
+  with `lineage.py` — and its one unique affordance, the lineage-save button,
+  targeted an endpoint that was never deployed. Recovery is unchanged: point the
+  node at an image and wire its outputs to a text-preview node, exactly as the
+  save nodes' `gallery_url` is displayed. Config members that existed only for
+  the panel (`save_url`, `connect_url`, `client_settings`, and their
+  `WORKFLOW_RECOVERY_SAVE_URL` / `WORKFLOW_RECOVERY_CONNECT_URL` overrides) are
+  removed; `WORKFLOW_RECOVERY_HTTP_TIMEOUT` remains.
 
 ### Notes
 
