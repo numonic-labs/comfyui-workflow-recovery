@@ -58,126 +58,117 @@ step — next.
 
 ## 2. Connect your Numonic account
 
-The save nodes authenticate with a Numonic API key that they read **from the machine
-running ComfyUI** — never from a node widget, because a widget value would be
-serialized into your saved workflows *and* embedded into your output files, leaking
-the key to anyone you share them with.
+One-time setup, three steps. The save nodes read your Numonic API key **from the
+machine running ComfyUI** — never from a node widget, because a widget value gets
+serialized into your saved workflows *and* embedded into your output files, which
+would leak the key to anyone you share them with.
 
-### 2.1 Get a key
+### Step 1 — get your key
 
 In Numonic: **Settings → API Keys → New key**, using the **"ComfyUI node key"**
 preset. Copy the `napi_…` value.
 
-**Prefer the least-privilege scope.** The preset mints a **`comfy-ingest`** key,
-which can add assets to your library and nothing else — if it ever leaked, the
-blast radius is limited to that. A general `write` key also works, but it can do
-considerably more, so only use one if you have a reason to. Keys are revocable at
-any time from the same screen; revoke and re-issue rather than reusing a key you
-are unsure about.
+That preset mints a **`comfy-ingest`** key, which can add assets to your library
+and nothing else — so if it ever leaked, that is the whole blast radius. A general
+`write` key also works but can do much more, so only use one if you have a reason
+to. Keys are revocable any time from the same screen.
 
-### 2.2 Give the key to ComfyUI — pick ONE of these
+### Step 2 — save the key on this computer
 
-> **⚠️ The one thing that trips people up:** an environment variable you type in a
-> terminal is only visible to programs launched **from that same terminal**. If you
-> start ComfyUI by double-clicking a `.bat`, from a desktop shortcut, from **ComfyUI
-> Desktop**, or as a background service, it will **not** see it — and the node will
-> report "No Numonic API key found". If in doubt, use **Option A**, which works no
-> matter how ComfyUI is started.
-
-#### Option A — config file (recommended, works everywhere)
-
-Create a file called `config.json` in a `.numonic` folder inside your home
-directory, containing:
+Create a small file called **`config.json`** in a folder named **`.numonic`**
+inside your home directory:
 
 ```json
 { "api_key": "napi_..." }
 ```
 
-| Platform | Full path |
-| --- | --- |
+| Platform    | Full path                                  |
+| ----------- | ------------------------------------------ |
 | **Windows** | `C:\Users\<your-name>\.numonic\config.json` |
-| **macOS** | `/Users/<your-name>/.numonic/config.json` |
-| **Linux** | `/home/<your-name>/.numonic/config.json` |
+| **macOS**   | `/Users/<your-name>/.numonic/config.json`   |
+| **Linux**   | `/home/<your-name>/.numonic/config.json`    |
 
-<details>
-<summary>Create it from a terminal (copy-paste)</summary>
+This works no matter how you start ComfyUI, and **takes effect immediately — no
+restart needed**. Pick whichever way of creating it you are comfortable with.
 
-**Windows (PowerShell)** — the second command restricts the file to your account
-(the Windows equivalent of `chmod 600`; your user profile is already
-ACL-protected, so this mainly matters on a shared or managed machine):
+#### Windows — with PowerShell (fastest)
+
+Paste all three lines into PowerShell, replacing `napi_...` with your key. The
+third line restricts the file to your account:
+
 ```powershell
 mkdir "$env:USERPROFILE\.numonic" -Force
 '{ "api_key": "napi_..." }' | Out-File -Encoding utf8 "$env:USERPROFILE\.numonic\config.json"
 icacls "$env:USERPROFILE\.numonic\config.json" /inheritance:r /grant:r "$($env:USERNAME):(R,W)"
 ```
 
-**macOS / Linux** — files are created group/world-readable by default, so the
-`chmod` is worth doing, not optional:
+#### Windows — by hand, no terminal
+
+1. Open **File Explorer**, click the address bar, type `%USERPROFILE%` and press
+   Enter. You are now in your user folder.
+2. **New → Folder**, and name it **`.numonic.`** — with a dot at *both* ends.
+   Windows removes the trailing dot and you are left with `.numonic`. (Typing just
+   `.numonic` works on newer Windows versions; use the trailing dot if it refuses.)
+3. Open **Notepad** and type exactly: `{ "api_key": "napi_..." }` with your key.
+4. **File → Save As**, open your new `.numonic` folder, and — this bit matters —
+   set **Save as type** to **All Files**, then name it `config.json`.
+   If you leave the type as "Text Documents", Notepad silently saves
+   `config.json.txt` and the node will not find it.
+
+> Tip: in Explorer, turn on **View → Show → File name extensions** so you can see
+> whether the file really is `config.json` and not `config.json.txt`.
+
+#### macOS / Linux — Terminal
+
 ```bash
 mkdir -p ~/.numonic
 printf '{ "api_key": "napi_..." }\n' > ~/.numonic/config.json
 chmod 600 ~/.numonic/config.json
 ```
-</details>
 
-#### About this file (please read once)
+The `chmod` matters: files are created readable by other accounts on the machine
+by default. The node warns you at save time if you skip it.
 
-The key is stored in **plain text**, exactly as `~/.aws/credentials`, `~/.npmrc`,
-`~/.docker/config.json` and most developer tooling store theirs. What protects it
-is your **operating-system user account**, so:
+#### macOS / Linux — by hand
 
-- **Restrict the file** if anyone else uses, administers, or can log into this
-  machine (the commands above). On macOS/Linux the node prints a warning at save
-  time if the file is readable by other users.
-- **It is never written into your workflows or your output files.** That is the
-  whole reason the key is not a node widget — you can share a workflow `.json` or
-  a generated PNG without leaking it.
-- **Watch out for folder sync.** If your home directory is synced to a cloud
-  drive or lives in a dotfiles repo, the key goes with it. Put it somewhere
-  unsynced, or use the environment-variable option instead.
-- **Revoke it** in Numonic → Settings → API Keys if the machine is shared,
-  retired, or you suspect exposure. Using the least-privilege `comfy-ingest`
-  scope (§2.1) keeps the impact small if that ever happens.
+Create `~/.numonic/config.json` in any text editor with the JSON above, then make
+it private (`chmod 600 ~/.numonic/config.json`). On macOS, Finder hides dot-folders
+— press `Cmd+Shift+.` to show them, or use the Terminal block above.
 
-The environment-variable option below is *not* more secure — an `export` in
-`~/.bashrc` is also a plaintext file, and Windows `setx` writes plain text to the
-registry. Pick whichever fits how you launch ComfyUI.
+<details>
+<summary><b>Alternative:</b> use an environment variable instead of a file</summary>
 
-#### Option B — environment variable
+Useful for servers, Docker, RunPod, or if you would rather not keep a file. Note
+that an environment variable **only reaches ComfyUI if it is set where ComfyUI is
+launched from** — if you start ComfyUI by double-clicking a `.bat`, from a desktop
+shortcut, from ComfyUI Desktop, or as a service, a variable typed into a terminal
+will **not** be visible to it. Unlike the config file, these all need a ComfyUI
+restart to take effect.
 
-Best when you launch ComfyUI from a terminal or run it as a service.
-
-**Windows — ComfyUI portable (`run_nvidia_gpu.bat`):** open the `.bat` in a text
-editor and add this line *above* the line that starts `python`:
+**Windows — ComfyUI Portable:** open `run_nvidia_gpu.bat` in Notepad and add this
+line *above* the line starting with `python`:
 
 ```bat
 set NUMONIC_API_KEY=napi_...
 ```
 
-**Windows — persistent, for any launcher:** run once, then **sign out and back in**
-(`setx` does not affect already-running programs or the current window):
+**Windows — persistent, any launcher:** run once, then sign out and back in
+(`setx` does not affect programs that are already running):
 
 ```bat
 setx NUMONIC_API_KEY "napi_..."
 ```
 
-**Windows — current PowerShell session only:**
-```powershell
-$env:NUMONIC_API_KEY = "napi_..."
-```
+**macOS / Linux:** export it, then start ComfyUI *from that same terminal*. Add the
+line to `~/.bashrc` / `~/.zshrc` to make it permanent.
 
-**macOS / Linux — terminal launch:** export it, then start ComfyUI *from that same
-terminal*:
 ```bash
 export NUMONIC_API_KEY="napi_..."
 python main.py
 ```
-To make it permanent, add that `export` line to `~/.bashrc` / `~/.zshrc`.
 
-<details>
-<summary>Linux — ComfyUI running as a <code>systemd</code> service</summary>
-
-A shell `export` will **not** reach a service. Give it the variable explicitly:
+**Linux — ComfyUI as a `systemd` service:** a shell `export` will not reach a
+service; give it the variable explicitly.
 
 ```bash
 sudo mkdir -p /etc/systemd/system/comfyui.service.d
@@ -188,16 +179,47 @@ CONF
 sudo systemctl daemon-reload
 sudo systemctl restart comfyui.service
 ```
-(Replace `comfyui.service` with your unit name.)
+
+(Replace `comfyui.service` with your unit name. Note that `~` for a service is the
+*service account's* home — often `/root` — so if you use the config file with a
+service, put it there.)
+
 </details>
 
-### 2.3 Restart ComfyUI
+<details>
+<summary><b>About this file</b> — how your key is stored (worth reading once)</summary>
 
-The key is read by the ComfyUI process, so **restart it** after setting either
-option. Then run a graph with a save node — success shows a `gallery_url`; any
-problem is reported in plain language (see [Troubleshooting](#5-troubleshooting)).
+The key is stored in **plain text**, exactly as `~/.aws/credentials`, `~/.npmrc`,
+`~/.docker/config.json` and most developer tooling store theirs. What protects it
+is your **operating-system user account**. So:
 
----
+- **Restrict the file** if anyone else uses, administers, or can log into this
+  machine — the `icacls` / `chmod` lines above do that. On macOS and Linux the node
+  prints a warning at save time if the file is readable by other users.
+- **It never goes into your workflows or your output files.** That is precisely why
+  the key is not a node widget: you can share a workflow `.json` or a generated PNG
+  without leaking it.
+- **Watch out for folder sync.** If your home directory syncs to a cloud drive or
+  lives in a dotfiles repo, the key travels with it. Keep it somewhere unsynced, or
+  use the environment variable instead.
+- **Revoke it** in Numonic → Settings → API Keys if the machine is shared, retired,
+  or you suspect exposure. The least-privilege `comfy-ingest` scope from Step 1
+  keeps the impact small if that happens.
+
+The environment variable is *not* more secure — an `export` in `~/.bashrc` is also
+a plaintext file, and Windows `setx` writes plain text into the registry. Choose
+based on how you launch ComfyUI, not on safety.
+
+</details>
+
+### Step 3 — use it
+
+- **Config file:** nothing else to do — it is read fresh on every save.
+- **Environment variable:** restart ComfyUI so the new value is picked up.
+
+Add a save node to a graph (next section) and queue a prompt. Success shows a
+`gallery_url`; anything wrong is reported in plain language — see
+[Troubleshooting](#5-troubleshooting).
 
 ## 3. Use the save nodes
 
@@ -258,7 +280,7 @@ Reads ComfyUI's `workflow` / `prompt` PNG metadata, including compressed (`zTXt`
 
 | What you see | What it means | Fix |
 | --- | --- | --- |
-| `No Numonic API key found` | The ComfyUI **process** can't see your key — almost always an environment variable set in a terminal while ComfyUI was launched some other way | Use [Option A, the config file](#option-a--config-file-recommended-works-everywhere), then restart ComfyUI |
+| `No Numonic API key found` | The ComfyUI **process** can't see your key — almost always an environment variable set in a terminal while ComfyUI was launched some other way, or a `config.json` Notepad saved as `config.json.txt` | Use [the config file](#step-2--save-the-key-on-this-computer); it needs no restart and works however ComfyUI is launched |
 | `Numonic rejected the API key (HTTP 401/403)` | Key is wrong, revoked, or lacks scope | Mint a fresh key with `write` or `comfy-ingest` scope; check for stray spaces/quotes |
 | `Your Numonic storage is full (HTTP 413)` | Tenant storage limit reached | Free up space or raise the limit, then re-run |
 | `Numonic is rate-limiting uploads (HTTP 429)` | Too many uploads too fast | Wait a moment and re-run |
