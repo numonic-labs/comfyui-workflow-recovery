@@ -229,8 +229,14 @@ function buildPanel(el) {
   const results = h("div", { class: "nwr-results" });
   const status = h("div", { class: "nwr-status" });
 
+  // The lineage-save button is NOT rendered. Its hosted endpoint was never
+  // deployed (the default host does not resolve), so the button could only ever
+  // fail with "Numonic is unreachable" — and the Save Image/Video to Numonic
+  // graph nodes supersede it anyway, capturing the lineage *and* the asset.
+  // `saveBtn`/`handleSave` below are intentionally left unreferenced pending a
+  // dedicated removal pass that also drops save_client.py and the /save route.
+  // See docs/CONTRACT-v0.md section 2.
   const saveBtn = h("button", { class: "nwr-btn nwr-save", text: "Save to Numonic" });
-  const actions = h("div", { class: "nwr-actions" }, saveBtn);
 
   let lastResult = null;
   let lastName = "";
@@ -303,9 +309,7 @@ function buildPanel(el) {
     handleFile(e.dataTransfer.files?.[0]);
   });
   fileInput.addEventListener("change", () => handleFile(fileInput.files?.[0]));
-  saveBtn.addEventListener("click", handleSave);
-
-  el.append(drop, fileInput, status, results, actions);
+  el.append(drop, fileInput, status, results);
 }
 
 app.registerExtension({
