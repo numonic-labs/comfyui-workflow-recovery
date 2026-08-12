@@ -14,7 +14,7 @@ Endpoint URLs are resolved from environment variables first, then fall back to
 the documented public defaults, so the node can be pointed at a local mock
 during development.
 
-Phase B note: the hosted "enhanced recovery" (image-inspect) path was removed —
+Note: the hosted "enhanced recovery" (image-inspect) path was removed in v0.3.0 —
 this file now covers only the display name, the HTTP timeout, and the sidebar
 lineage-save funnel's connect/save URLs. The asset-save nodes resolve their own
 host + key via ``credential.py``.

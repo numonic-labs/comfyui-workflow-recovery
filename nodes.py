@@ -4,7 +4,7 @@ Three nodes:
 
   * ``Extract Workflow Lineage`` — read a saved image's embedded ComfyUI
     metadata and recover its lineage locally (no network). Unchanged in intent;
-    the opt-in "enhanced recovery" network path was removed in Phase B.
+    the opt-in "enhanced recovery" network path was removed in v0.3.0.
   * ``Save Image to Numonic`` — drop-in for the stock *Save Image*: encode the
     ``IMAGE`` tensor to PNG (workflow embedded) and ingest it into Numonic as a
     first-class asset, returning the gallery link.

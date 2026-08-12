@@ -9,7 +9,7 @@ Two routes, namespaced under ``/numonic/workflow-recovery``:
     account using a token the *user* supplies in the request. This package holds
     no token of its own.
 
-(The Phase B asset-save graph nodes upload real bytes directly from the worker
+(The asset-save graph nodes upload real bytes directly from the worker
 thread and do not use a server route — see ``upload_client.py``.)
 
 The blocking outbound HTTP call runs in a thread executor so the aiohttp event

@@ -37,7 +37,7 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("connectUrl", settings)
 
     def test_client_settings_have_no_enhanced_flag(self):
-        # Enhanced recovery was removed in Phase B; the flag must be gone.
+        # Enhanced recovery was removed in v0.3.0; the flag must be gone.
         self.assertNotIn("enhancedRecoveryAvailable", config.client_settings())
 
 
