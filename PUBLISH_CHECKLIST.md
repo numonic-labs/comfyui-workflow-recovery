@@ -53,15 +53,17 @@ confirmed (Claim-My-Node) — no separate action needed.
 
 ## Integration dependency (not a gate, but sequence-sensitive)
 
-- The **enhanced-recovery** and **save** endpoints are owned by a private,
-  separately-hosted service (`/v1/comfy-inspect`; save reuses an authenticated
-  ingest route). The node ships against **contract v0**
-  (`docs/CONTRACT-v0.md`). Confirm the final URLs and set them via
-  `WORKFLOW_RECOVERY_INSPECT_URL` / `WORKFLOW_RECOVERY_SAVE_URL` (or update the
-  defaults in `config.py`) once that endpoint is live.
-- **Local recovery works today with no endpoint** — the node is useful and
-  demoable before the hosted endpoint lands. Enhanced/save simply stay dormant
-  until the URLs resolve.
+- The **Save to Numonic** graph nodes call Numonic's existing asset pipeline
+  (`GET /api/v1/storage/signed-url/upload` → storage `PUT` →
+  `POST /api/v1/assets`) with a host-configured `napi_` key. Confirm the hosted
+  gallery-link shape (`${APP_URL}/app/assets/{assetH}`) matches what the web app
+  returns; override the host via `NUMONIC_APP_URL` / `NUMONIC_API_URL` for
+  staging.
+- The sidebar **lineage-save** funnel still posts to the private ingest route
+  (`WORKFLOW_RECOVERY_SAVE_URL`, contract v0 in `docs/CONTRACT-v0.md`).
+- **Local recovery works today with no endpoint and no key** — the pack is
+  useful and demoable before anything hosted lands; the save nodes simply report
+  a clear "set NUMONIC_API_KEY" message until a key is configured.
 
 ## Governance (decided 2026-07-08)
 

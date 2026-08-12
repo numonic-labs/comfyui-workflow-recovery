@@ -30,9 +30,13 @@ raise it in an issue first.
 
 - Python: standard library only; keep the ComfyUI-runtime imports (`server`,
   `folder_paths`) guarded so modules remain importable under unit test.
-- Keep the three-tier privacy model intact: **local by default; enhanced recovery
-  opt-in; save opt-in + authenticated with a user-supplied token.** No code path
-  may send an image or prompt text off-machine without explicit user action.
+- Keep the privacy model intact: **recovery is local by default and needs no
+  network; saving is opt-in and authenticated with a host-configured API key the
+  user supplies**. No code path may send an image, a video, or prompt text
+  off-machine without explicit user action.
+- The API key is read from the host environment or `~/.numonic/config.json` only —
+  **never** from a node widget, which would serialize it into saved workflows and
+  embed it into output files.
 - No secrets, tokens, or private endpoints in the repo — ever.
 
 ## Versioning

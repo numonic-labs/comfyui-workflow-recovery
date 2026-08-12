@@ -5,11 +5,11 @@
  *   1. LOCAL by default — a dropped image is parsed entirely in the browser.
  *      Its embedded `workflow` / `prompt` chunks are read here; nothing leaves
  *      the machine.
- *   2. ENHANCED recovery is OPT-IN — only when the user ticks the box does the
- *      image get POSTed to this pack's `/recover` route (which forwards to the
- *      read-only hosted inspect service).
- *   3. SAVE is OPT-IN + authenticated — requires a user-owned token stored in
+ *   2. SAVE is OPT-IN + authenticated — requires a user-owned token stored in
  *      this browser. No token → we open the connect page instead of sending.
+ *      (This sidebar save posts recovered *lineage* only. To save the generated
+ *      *asset* itself into Numonic, use the "Save Image/Video to Numonic" graph
+ *      nodes, which read a host-configured key.)
  *
  * This file holds no secret. The token is the user's, stored in localStorage.
  */
@@ -169,7 +169,7 @@ function normalizeLocal(workflowRaw, promptRaw) {
   result.recovered = !!(result.workflow_graph || result.models.length ||
     result.prompts.positive || result.prompts.negative);
   if (workflow && !prompt) {
-    result.warnings.push("Only the UI workflow chunk was present; details are best-effort. Try enhanced recovery.");
+    result.warnings.push("Only the UI workflow chunk was present; prompt/model details are best-effort.");
   }
   return result;
 }
@@ -205,8 +205,7 @@ function renderResult(container, result, sourceName) {
     container.append(h("div", { class: "nwr-empty",
       text: (result.warnings[0] || "No lineage recovered.") }));
   }
-  const badge = result.mode === "enhanced" ? "enhanced (via Numonic)" : "local only";
-  container.append(h("div", { class: "nwr-meta", text: `${sourceName} · ${badge}` }));
+  container.append(h("div", { class: "nwr-meta", text: `${sourceName} · local` }));
   container.append(section("Positive prompt", result.prompts.positive));
   container.append(section("Negative prompt", result.prompts.negative));
   container.append(section("Models", (result.models || []).join("\n")));
@@ -227,14 +226,17 @@ function buildPanel(el) {
 
   const drop = h("div", { class: "nwr-drop", text: "Drop a generated image here, or click to choose" });
   const fileInput = h("input", { type: "file", accept: "image/*", class: "nwr-file" });
-  const enhanced = h("input", { type: "checkbox", class: "nwr-enh" });
-  const enhancedLabel = h("label", { class: "nwr-enh-label" }, enhanced,
-    h("span", { text: " Enhanced recovery (sends image to Numonic to parse — read-only, not stored)" }));
   const results = h("div", { class: "nwr-results" });
   const status = h("div", { class: "nwr-status" });
 
+  // The lineage-save button is NOT rendered. Its hosted endpoint was never
+  // deployed (the default host does not resolve), so the button could only ever
+  // fail with "Numonic is unreachable" — and the Save Image/Video to Numonic
+  // graph nodes supersede it anyway, capturing the lineage *and* the asset.
+  // `saveBtn`/`handleSave` below are intentionally left unreferenced pending a
+  // dedicated removal pass that also drops save_client.py and the /save route.
+  // See docs/CONTRACT-v0.md section 2.
   const saveBtn = h("button", { class: "nwr-btn nwr-save", text: "Save to Numonic" });
-  const actions = h("div", { class: "nwr-actions" }, saveBtn);
 
   let lastResult = null;
   let lastName = "";
@@ -246,31 +248,15 @@ function buildPanel(el) {
     results.replaceChildren();
     const buffer = await file.arrayBuffer();
 
-    if (enhanced.checked) {
-      status.textContent = "Enhanced recovery…";
-      try {
-        const form = new FormData();
-        form.append("image", new Blob([buffer]), file.name);
-        const resp = await fetch(ROUTE + "/recover", { method: "POST", body: form });
-        if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).error || resp.statusText);
-        lastResult = await resp.json();
-        status.textContent = "";
-        renderResult(results, lastResult, file.name);
-        return;
-      } catch (e) {
-        status.textContent = "Enhanced recovery failed; showing local result. (" + e.message + ")";
-      }
-    }
-
     try {
       const chunks = await readPngTextChunks(buffer);
       lastResult = normalizeLocal(chunks.workflow, chunks.prompt);
-      if (!enhanced.checked) status.textContent = "";
+      status.textContent = "";
       renderResult(results, lastResult, file.name);
     } catch (e) {
       lastResult = null;
       status.textContent = e.message === "not-a-png"
-        ? "Local recovery reads PNG metadata. For other formats, enable enhanced recovery."
+        ? "Local recovery reads PNG metadata. This file has none (or isn't a PNG)."
         : "Could not read this file.";
     }
   }
@@ -323,9 +309,7 @@ function buildPanel(el) {
     handleFile(e.dataTransfer.files?.[0]);
   });
   fileInput.addEventListener("change", () => handleFile(fileInput.files?.[0]));
-  saveBtn.addEventListener("click", handleSave);
-
-  el.append(drop, fileInput, enhancedLabel, status, results, actions);
+  el.append(drop, fileInput, status, results);
 }
 
 app.registerExtension({
