@@ -1,7 +1,8 @@
 # Numonic Workflow Recovery
 
-**Save your ComfyUI generations straight into [Numonic](https://numonic.ai) — and
-recover the workflow behind any ComfyUI image.**
+**Save your ComfyUI generations straight into [Numonic](https://numonic.ai) with
+their workflow lineage attached, and recover embedded workflow details from
+existing ComfyUI PNGs.**
 
 A free, open-source ComfyUI custom node pack from [Numonic](https://numonic.ai),
 a digital asset manager for AI-generated work.
@@ -10,8 +11,9 @@ a digital asset manager for AI-generated work.
   Video*. When your graph runs, the generated asset itself (real bytes, with its
   ComfyUI workflow embedded) lands in your Numonic library, and the node hands you
   the gallery link.
-- **Recover lineage** — prompts, models, LoRAs, seed, sampler and custom nodes,
-  read straight out of a PNG ComfyUI already saved. Lost the `.json`? Recover it.
+- **Recover lineage** — from ComfyUI PNGs that still contain embedded workflow
+  metadata. Extract prompts, models, LoRAs, custom-node references and lineage
+  JSON for use in another graph.
 
 ---
 
@@ -73,7 +75,7 @@ Create an account at **[numonic.ai](https://numonic.ai)**, then come back here.
 (You only need an account for *saving*; recovering a workflow from an image works
 offline with no account — see [section 4](#4-recover-a-workflow-from-an-image).)
 
-In Numonic, open **[Settings → API Keys](https://numonic.ai/app/settings)** →
+In Numonic, open **[Settings → API Keys](https://www.numonic.ai/app/settings/workspace)** →
 **New key**, using the **"ComfyUI node key"** preset. Copy the `napi_…` value.
 
 That preset mints a **`comfy-ingest`** key, which can add assets to your library
@@ -300,12 +302,27 @@ workflow lineage (prompts, models, LoRAs, seed, sampler) already extracted.
 ## 4. Recover a workflow from an image
 
 Add the **`Extract Workflow Lineage`** node and point it at an image in your input
-folder. It outputs the positive/negative prompts, models, LoRAs, custom nodes and
-the raw workflow JSON as strings you can use elsewhere in a graph.
+folder. Positive/negative prompts, models, LoRAs and custom-node references each
+have their own output socket; the seed, sampler and full embedded workflow graph
+are available inside the `lineage_json` output.
 
 Entirely local — nothing leaves your machine. Reads ComfyUI's `workflow` / `prompt`
 PNG metadata, including the compressed (`zTXt` / `iTXt`) chunks that some tools
 miss.
+
+**Limitations:**
+
+- Recovery requires a PNG that still contains embedded ComfyUI `workflow` or
+  `prompt` metadata. Metadata removed during conversion or optimization cannot be
+  recovered.
+- Prompt roles and some workflow details are recovered on a best-effort basis when
+  complete execution metadata is unavailable.
+- LoRA names can be extracted, but LoRA weights are not currently returned. Seeds
+  supplied through graph links may not resolve.
+
+Once you've recovered a workflow, connect a Numonic API key (see
+[section 2](#2-connect-your-numonic-account)) so future generations are saved —
+with their lineage attached — automatically.
 
 ---
 
