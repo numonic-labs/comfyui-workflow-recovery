@@ -4,6 +4,16 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Published Registry versions are
 immutable.
 
+## [0.3.2] - 2026-11-16
+
+### Fixed
+
+- Same fix as 0.3.1, which the Registry's security scan flagged and never made
+  available: `Save Video to Numonic` no longer reports a raw `TimeoutError` when
+  the confirm step is slow (see 0.3.1 below for the behaviour). 0.3.2 drops the
+  redundant `socket` import and reads environment variables by fixed name only,
+  matching 0.3.0's code patterns. No behaviour change from 0.3.1.
+
 ## [0.3.1] - 2026-11-16
 
 ### Fixed

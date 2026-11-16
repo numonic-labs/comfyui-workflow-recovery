@@ -31,7 +31,6 @@ node calls it from ComfyUI's worker thread.
 from __future__ import annotations
 
 import json
-import socket
 import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
@@ -83,7 +82,8 @@ def _friendly_http_error(exc: urllib.error.HTTPError, phase: str) -> UploadError
     )
 
 
-_TIMEOUT_ERRORS = (socket.timeout, TimeoutError)
+# Python >= 3.10 (see pyproject.toml): a read timeout is the built-in TimeoutError.
+_TIMEOUT_ERRORS = (TimeoutError,)
 
 
 def _timeout_error(phase: str, timeout: float) -> UploadError:

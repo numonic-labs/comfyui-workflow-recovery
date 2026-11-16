@@ -24,4 +24,4 @@ __all__ = [
     "NODE_DISPLAY_NAME_MAPPINGS",
 ]
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"

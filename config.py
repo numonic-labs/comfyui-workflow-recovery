@@ -28,8 +28,7 @@ _DEFAULT_HTTP_TIMEOUT = 20.0
 _DEFAULT_CONFIRM_TIMEOUT = 120.0
 
 
-def _positive_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
+def _positive_float(raw: str | None, default: float) -> float:
     if raw is None:
         return default
     try:
@@ -41,7 +40,9 @@ def _positive_float(name: str, default: float) -> float:
 
 def http_timeout() -> float:
     """Outbound HTTP timeout (seconds) for the quick network calls."""
-    return _positive_float(ENV_HTTP_TIMEOUT, _DEFAULT_HTTP_TIMEOUT)
+    return _positive_float(
+        os.environ.get(ENV_HTTP_TIMEOUT), _DEFAULT_HTTP_TIMEOUT
+    )
 
 
 def confirm_timeout(floor: float = 0.0) -> float:
@@ -54,4 +55,4 @@ def confirm_timeout(floor: float = 0.0) -> float:
     shrink for confirm.
     """
     default = max(_DEFAULT_CONFIRM_TIMEOUT, http_timeout(), floor)
-    return _positive_float(ENV_CONFIRM_TIMEOUT, default)
+    return _positive_float(os.environ.get(ENV_CONFIRM_TIMEOUT), default)

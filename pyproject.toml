@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-workflow-recovery"
-version = "0.3.1"
+version = "0.3.2"
 description = "Recover a ComfyUI image's full workflow lineage, and save generated images/videos straight into your Numonic library (with lineage) as a drop-in for Save Image / Save Video. Local-first and privacy-preserving."
 license = { file = "LICENSE" }
 readme = "README.md"
