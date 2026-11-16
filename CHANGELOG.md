@@ -4,6 +4,21 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Published Registry versions are
 immutable.
 
+## [Unreleased]
+
+### Fixed
+
+- **`Save Video to Numonic` reported a `TimeoutError` although the asset was
+  created.** The confirm step (server downloads the file, extracts lineage,
+  creates the asset) shared the 20 s default timeout and exceeded it for clips of
+  20 s or more. Confirm now has its own default of 120 s, configurable with
+  `WORKFLOW_RECOVERY_CONFIRM_TIMEOUT` (a value you set is used as-is; when
+  unset the default is never lower than `WORKFLOW_RECOVERY_HTTP_TIMEOUT`).
+  Timeouts in any phase now raise a clear
+  upload error (naming the variable to raise, and for confirm, noting the asset
+  may already exist and that re-running is safe) instead of a raw `TimeoutError`.
+  No workaround variable is needed any more.
+
 ## [0.3.0] - 2026-08-12
 
 ### Added

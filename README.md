@@ -369,7 +369,8 @@ default.
 | `NUMONIC_API_KEY` | Your `napi_` key (or use `~/.numonic/config.json`) | — |
 | `NUMONIC_APP_URL` | Numonic app host, used for the returned gallery link | `https://www.numonic.ai` |
 | `NUMONIC_API_URL` | Numonic REST API host — only change this to target a self-hosted or staging instance | same as `NUMONIC_APP_URL` |
-| `WORKFLOW_RECOVERY_HTTP_TIMEOUT` | Network timeout, seconds | `20` |
+| `WORKFLOW_RECOVERY_HTTP_TIMEOUT` | Network timeout for the signed-URL request and the storage upload, seconds | `20` |
+| `WORKFLOW_RECOVERY_CONFIRM_TIMEOUT` | Timeout for the confirm step, where Numonic downloads and processes the file (long videos need more), seconds | `120` (when unset, never below `WORKFLOW_RECOVERY_HTTP_TIMEOUT`; a value you set is used as-is) |
 
 The config file accepts the same host overrides as keys: `api_key`, `app_url`,
 `api_url`.

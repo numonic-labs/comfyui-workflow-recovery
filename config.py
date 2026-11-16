@@ -19,13 +19,39 @@ from __future__ import annotations
 import os
 
 ENV_HTTP_TIMEOUT = "WORKFLOW_RECOVERY_HTTP_TIMEOUT"
+ENV_CONFIRM_TIMEOUT = "WORKFLOW_RECOVERY_CONFIRM_TIMEOUT"
+
+_DEFAULT_HTTP_TIMEOUT = 20.0
+# The confirm phase makes the server download the file, extract lineage and
+# create the asset, so it scales with file size (a 20 s+ LTX video exceeded the
+# 20 s default). It gets its own, longer default.
+_DEFAULT_CONFIRM_TIMEOUT = 120.0
 
 
-def http_timeout() -> float:
-    """Outbound HTTP timeout (seconds) for the network calls."""
-    raw = os.environ.get(ENV_HTTP_TIMEOUT, "20")
+def _positive_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        return 20.0
-    return value if value > 0 else 20.0
+        return default
+    return value if value > 0 else default
+
+
+def http_timeout() -> float:
+    """Outbound HTTP timeout (seconds) for the quick network calls."""
+    return _positive_float(ENV_HTTP_TIMEOUT, _DEFAULT_HTTP_TIMEOUT)
+
+
+def confirm_timeout(floor: float = 0.0) -> float:
+    """Timeout (seconds) for the confirm-upload call.
+
+    A valid ``WORKFLOW_RECOVERY_CONFIRM_TIMEOUT`` always wins, even when it is
+    lower than the shared timeout. Otherwise it is the 120 s default, but never
+    lower than ``WORKFLOW_RECOVERY_HTTP_TIMEOUT`` (or ``floor``, the caller's own
+    shared timeout) so a user who raised the shared timeout does not see it
+    shrink for confirm.
+    """
+    default = max(_DEFAULT_CONFIRM_TIMEOUT, http_timeout(), floor)
+    return _positive_float(ENV_CONFIRM_TIMEOUT, default)

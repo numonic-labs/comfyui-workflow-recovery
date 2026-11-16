@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -22,9 +23,13 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        if payload:
-            self.wfile.write(payload)
+        try:
+            self.end_headers()
+            if payload:
+                self.wfile.write(payload)
+        except BrokenPipeError:
+            # The client gave up first (the confirm-timeout test does this).
+            pass
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0) or 0)
@@ -44,6 +49,8 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path.endswith(_CONFIRM):
             self.server.calls.append(("POST", "confirm"))
             self.server.confirm_body = raw
+            if cfg.get("confirm_delay"):
+                time.sleep(cfg["confirm_delay"])
             code = cfg.get("phase3", 200)
             if code != 200:
                 return self._send(code, b'{"error":"phase3"}')
@@ -192,6 +199,43 @@ class UploadClientTests(unittest.TestCase):
             first = _upload(svc)
             second = _upload(svc)
         self.assertEqual(first["gallery_url"], second["gallery_url"])
+
+    def test_slow_confirm_succeeds_when_confirm_timeout_is_longer(self):
+        # Regression: confirm downloads + processes the file server-side
+        # and can outlast the short shared timeout used for phases 1-2.
+        with MockNumonic({"confirm_delay": 0.6}) as svc:
+            result = _upload(svc, confirm_timeout=5)
+        self.assertEqual(result["assetH"], "asset123")
+
+    def test_confirm_read_timeout_is_an_upload_error_not_a_raw_timeout(self):
+        with MockNumonic({"confirm_delay": 1.0}) as svc:
+            with self.assertRaises(upload_client.UploadError) as ctx:
+                _upload(svc, confirm_timeout=0.3)
+        message = str(ctx.exception).lower()
+        self.assertIn("timed out", message)
+        # The asset may already exist; the message must say a re-run is safe.
+        self.assertIn("may have been created", message)
+        self.assertIn("WORKFLOW_RECOVERY_CONFIRM_TIMEOUT", str(ctx.exception))
+
+    def test_confirm_env_override_is_honoured_even_below_shared_timeout(self):
+        # Regression: an explicit WORKFLOW_RECOVERY_CONFIRM_TIMEOUT used to be
+        # floored up to the shared timeout (max(...)), so lowering it did nothing.
+        os.environ["WORKFLOW_RECOVERY_CONFIRM_TIMEOUT"] = "0.3"
+        self.addCleanup(
+            lambda: os.environ.pop("WORKFLOW_RECOVERY_CONFIRM_TIMEOUT", None)
+        )
+        with MockNumonic({"confirm_delay": 1.0}) as svc:
+            with self.assertRaises(upload_client.UploadError) as ctx:
+                _upload(svc)  # shared timeout=5, no confirm_timeout kwarg
+        self.assertIn("timed out", str(ctx.exception).lower())
+
+    def test_confirm_default_is_not_shorter_than_an_explicit_shared_timeout(self):
+        # With no env override, a caller-raised shared timeout must not shrink
+        # for confirm (default 120 s, never below the shared timeout).
+        os.environ.pop("WORKFLOW_RECOVERY_CONFIRM_TIMEOUT", None)
+        with MockNumonic({"confirm_delay": 0.4}) as svc:
+            result = _upload(svc)
+        self.assertEqual(result["assetH"], "asset123")
 
     def test_missing_credential_raises_before_any_request(self):
         saved = {k: os.environ.get(k) for k in (credential.API_KEY_ENV, "HOME")}

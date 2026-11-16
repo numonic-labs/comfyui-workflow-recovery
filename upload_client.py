@@ -31,6 +31,7 @@ node calls it from ComfyUI's worker thread.
 from __future__ import annotations
 
 import json
+import socket
 import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
@@ -82,6 +83,27 @@ def _friendly_http_error(exc: urllib.error.HTTPError, phase: str) -> UploadError
     )
 
 
+_TIMEOUT_ERRORS = (socket.timeout, TimeoutError)
+
+
+def _timeout_error(phase: str, timeout: float) -> UploadError:
+    """User-facing message for a timeout; names the env var that fixes it."""
+    if phase == "confirm upload":
+        return UploadError(
+            "Numonic timed out during confirm upload after %g s. The file was "
+            "uploaded and the asset may have been created and still be "
+            "processing - check your Numonic library. Re-running is safe "
+            "(identical bytes are deduplicated). To wait longer, set "
+            "WORKFLOW_RECOVERY_CONFIRM_TIMEOUT (seconds) before starting ComfyUI."
+            % timeout
+        )
+    return UploadError(
+        "Numonic timed out during %s after %g s. Re-run the graph, or raise "
+        "WORKFLOW_RECOVERY_HTTP_TIMEOUT (seconds) before starting ComfyUI."
+        % (phase, timeout)
+    )
+
+
 def _request_json(
     url: str,
     *,
@@ -98,7 +120,13 @@ def _request_json(
             payload = response.read()
     except urllib.error.HTTPError as exc:
         raise _friendly_http_error(exc, phase) from exc
+    except _TIMEOUT_ERRORS as exc:
+        # A read timeout surfaces as a bare TimeoutError (not a URLError), which
+        # ComfyUI would show as a raw execution error.
+        raise _timeout_error(phase, timeout) from exc
     except urllib.error.URLError as exc:
+        if isinstance(exc.reason, _TIMEOUT_ERRORS):
+            raise _timeout_error(phase, timeout) from exc
         raise UploadError(
             "Numonic is unreachable during %s: %s" % (phase, exc.reason)
         ) from exc
@@ -155,7 +183,11 @@ def _phase2_put_bytes(
             response.read()
     except urllib.error.HTTPError as exc:
         raise _friendly_http_error(exc, "storage upload") from exc
+    except _TIMEOUT_ERRORS as exc:
+        raise _timeout_error("storage upload", timeout) from exc
     except urllib.error.URLError as exc:
+        if isinstance(exc.reason, _TIMEOUT_ERRORS):
+            raise _timeout_error("storage upload", timeout) from exc
         raise UploadError(
             "Storage upload failed (unreachable): %s" % exc.reason
         ) from exc
@@ -207,6 +239,7 @@ def upload_asset(
     api_base: Optional[str] = None,
     app_base: Optional[str] = None,
     timeout: Optional[float] = None,
+    confirm_timeout: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Run the three-phase upload and return the asset + gallery link.
 
@@ -235,6 +268,13 @@ def upload_asset(
     resolved_api_base = (api_base or credential.api_base_url()).rstrip("/")
     resolved_app_base = (app_base or credential.app_base_url()).rstrip("/")
     effective_timeout = timeout if timeout is not None else config.http_timeout()
+    # Confirm is server-side work that scales with file size, so it gets its own
+    # longer timeout. An explicit WORKFLOW_RECOVERY_CONFIRM_TIMEOUT always wins;
+    # the default is never shorter than the caller's shared timeout.
+    if confirm_timeout is not None:
+        effective_confirm_timeout = confirm_timeout
+    else:
+        effective_confirm_timeout = config.confirm_timeout(floor=effective_timeout)
 
     auth: Dict[str, str] = {
         "Authorization": "Bearer %s" % key,
@@ -252,7 +292,7 @@ def upload_asset(
         len(data),
         mime_type,
         auth,
-        effective_timeout,
+        effective_confirm_timeout,
     )
 
     asset_h = str(confirm["asset"]["assetH"])
