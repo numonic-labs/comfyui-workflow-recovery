@@ -4,7 +4,7 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Published Registry versions are
 immutable.
 
-## [Unreleased]
+## [0.3.1] - 2026-11-16
 
 ### Fixed
 
